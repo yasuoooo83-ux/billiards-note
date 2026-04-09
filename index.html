@@ -648,95 +648,86 @@
 
     /* ==========================================
        LANDSCAPE (横画面) LAYOUT
-       台を最大化し、右サイドバーに縦積みコントロール
+       左: 台を最大化 / 右: 110px固定1列サイドバー
+       Stats・振り・カット角などは非表示
     ========================================== */
     @media (orientation: landscape) and (max-height: 500px) {
 
-      /* ヘッダーを薄く */
-      header {
-        padding: 4px 10px;
-      }
+      /* ヘッダー圧縮 */
+      header { padding: 4px 10px; }
       .header-title { font-size: 0.85rem; }
-      .tab-btn { padding: 3px 9px; font-size: 0.72rem; }
+      .tab-btn { padding: 3px 8px; font-size: 0.7rem; }
 
-      /* main を横並びに（ヘッダー除く全体） */
-      main { flex-direction: row; }
-
-      /* table view: キャンバスを最大化、右サイドバー固定幅 */
+      /* table viewを左右2カラムに */
       #view-table {
         flex-direction: row;
         padding: 4px;
         gap: 4px;
-        align-items: stretch;
         overflow: hidden;
       }
 
-      /* ===== 左: キャンバス（残り全幅） ===== */
+      /* 左: キャンバスが残り全幅を占有 */
       #view-table .canvas-wrapper {
         flex: 1;
-        order: 0;
         min-width: 0;
         min-height: 0;
-        align-items: stretch;
       }
 
-      /* ===== 右サイドバー: 130px固定 ===== */
-      #view-table .ball-selector,
-      #view-table .stats-spin-row,
-      #view-table .action-bar {
-        width: 130px;
+      /* 右: 110px固定の縦1列サイドバー */
+      #view-table .ball-selector {
+        width: 110px;
         flex-shrink: 0;
-        flex-grow: 0;
-        /* flex-wrap で右カラムに積み上がるよう order を付ける */
-      }
-      #view-table .ball-selector  { order: 1; align-self: flex-start; padding: 5px 6px; }
-      #view-table .stats-spin-row { order: 2; align-self: flex-start; flex-direction: column; border-radius: var(--radius-sm); }
-      #view-table .action-bar     { order: 3; align-self: flex-start; padding: 4px 5px; gap: 3px; flex-wrap: wrap; border-radius: var(--radius-sm); }
-
-      /* flex-wrap で右カラムを折り返しで縦積みにする */
-      #view-table {
-        flex-wrap: wrap;
-        align-content: flex-start;
-      }
-      /* canvas-wrapper だけ高さを全体に伸ばす */
-      #view-table .canvas-wrapper {
-        height: 100%;
-        align-self: stretch;
-      }
-
-      /* ---- 右サイドバー内の要素を小さく ---- */
-      .selector-label { display: none; }
-      .ball-options { gap: 4px; justify-content: center; }
-      .ball-opt { padding: 2px 5px; font-size: 0.6rem; }
-      .ball-circle { width: 20px; height: 20px; }
-
-      .stats-panel {
-        grid-template-columns: 1fr 1fr;
-        gap: 2px 4px;
         padding: 5px 6px;
+        gap: 5px;
+        border-radius: var(--radius-sm);
+        order: 0; /* デフォルトの積み順で使わない */
       }
-      .stat-label { font-size: 0.54rem; }
-      .stat-value { font-size: 0.78rem; }
+      #view-table .stats-spin-row {
+        width: 110px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        flex-direction: column;
+      }
+      #view-table .action-bar {
+        width: 110px;
+        flex-shrink: 0;
+        padding: 4px 5px;
+        gap: 4px;
+        flex-direction: column;
+        border-radius: var(--radius-sm);
+        border-top: none;
+      }
 
-      /* spin selector を横並びでコンパクトに */
+      /* ---- Stats: カット角・振り・ポケット距離は非表示 ---- */
+      /* stats-panelごと非表示にして撞点だけ残す */
+      .stats-panel { display: none; }
+
+      /* spin selectorを縦全幅で表示 */
+      .stats-spin-row { background: var(--bg-card); }
       .spin-selector {
         border-left: none;
-        border-top: 1px solid rgba(255,255,255,0.07);
-        flex-direction: row;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 4px 6px;
-        gap: 6px;
+        padding: 6px;
+        gap: 4px;
+        width: 100%;
       }
-      .spin-label { font-size: 0.55rem; }
-      .spin-value { font-size: 0.58rem; }
+      .spin-label { font-size: 0.58rem; }
+      .spin-value { font-size: 0.6rem; }
 
-      /* ボタン: 2列で詰める */
+      /* ボールセレクター */
+      .selector-label { display: none; }
+      .ball-options { gap: 6px; justify-content: center; }
+      .ball-opt { padding: 3px 5px; font-size: 0.62rem; }
+      .ball-circle { width: 22px; height: 22px; }
+
+      /* ボタン: 縦1列 */
       #view-table .action-bar .btn {
-        padding: 7px 3px;
-        font-size: 0.62rem;
-        flex-basis: calc(50% - 2px);
-        min-width: 0;
+        padding: 9px 4px;
+        font-size: 0.65rem;
+        width: 100%;
+        flex: none;
       }
     }
 
