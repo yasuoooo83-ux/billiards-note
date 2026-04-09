@@ -1,0 +1,2985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a2e1a">
+  <meta name="description" content="ビリヤード配置記録・分析Webアプリ - 手動配置で角度・距離を自動計算">
+  <title>ビリヤード配置ノート</title>
+  <style>
+    /* ==========================================
+       DESIGN TOKENS & RESET
+    ========================================== */
+    :root {
+      --green-felt: #2e7d4f;
+      --green-felt-dark: #1e5c38;
+      --green-felt-light: #3a9e62;
+      --cushion: #8B4513;
+      --cushion-dark: #6b3410;
+      --pocket: #111;
+      --white-ball: #f5f5f0;
+      --red-ball: #e53935;
+      --yellow-ball: #fdd835;
+      --aim-line: rgba(255,220,0,0.85);
+      --bg: #0f1f0f;
+      --bg-card: #1a2e1a;
+      --bg-card2: #162816;
+      --text: #e8f5e9;
+      --text-muted: #81c784;
+      --accent: #66bb6a;
+      --accent-bright: #a5d6a7;
+      --danger: #ef5350;
+      --success: #43a047;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'メイリオ', sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    /* ==========================================
+       HEADER
+    ========================================== */
+    header {
+      background: linear-gradient(135deg, var(--bg-card) 0%, #0d1f0d 100%);
+      border-bottom: 2px solid var(--cushion-dark);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-bright);
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title::before {
+      content: '🎱';
+      font-size: 1.3rem;
+    }
+
+    .tab-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ==========================================
+       MAIN AREA
+    ========================================== */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .view.active {
+      display: flex;
+    }
+
+    /* ==========================================
+       TABLE VIEW
+    ========================================== */
+    #view-table {
+      padding: 12px 12px 0 12px;
+      gap: 10px;
+    }
+
+    /* ---- Ball Selector ---- */
+    .ball-selector {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .selector-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .selector-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      min-width: 60px;
+    }
+
+    .ball-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ball-opt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      border: 2px solid transparent;
+      transition: all 0.15s;
+      background: transparent;
+      color: var(--text);
+      font-size: 0.7rem;
+    }
+
+    .ball-opt.selected {
+      border-color: var(--accent);
+      background: rgba(102,187,106,0.12);
+    }
+
+    .ball-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      box-shadow: inset -4px -4px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(255,255,255,0.3);
+    }
+
+    .ball-circle.cue { background: var(--white-ball); border: 1px solid #ccc; }
+    .ball-circle.ball-red { background: var(--red-ball); }
+    .ball-circle.ball-yellow { background: var(--yellow-ball); }
+    .ball-circle.ball-blue { background: #1565c0; }
+
+    /* Pocket selector */
+    .pocket-opts {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pocket-opt {
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1.5px solid var(--text-muted);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pocket-opt.selected {
+      background: var(--cushion);
+      border-color: var(--cushion);
+      color: #fff;
+    }
+
+    /* ---- Canvas Wrapper ---- */
+    .canvas-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      position: relative;
+    }
+
+    #billiards-canvas {
+      display: block;
+      touch-action: none;
+      border-radius: 4px;
+      cursor: crosshair;
+    }
+
+    /* ---- Stats Panel + Spin Selector Row ---- */
+    .stats-spin-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .stats-panel {
+      flex: 1;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+    }
+
+    /* ---- Spin Selector ---- */
+    .spin-selector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 10px 8px 6px;
+      gap: 4px;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+
+    .spin-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    #spin-canvas {
+      cursor: crosshair;
+      touch-action: none;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .spin-value {
+      font-size: 0.65rem;
+      color: var(--accent-bright);
+      font-weight: 600;
+      text-align: center;
+      min-height: 1em;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent-bright);
+    }
+
+    /* ---- Action Buttons ---- */
+    .action-bar {
+      background: var(--bg-card2);
+      border-top: 1px solid #2a3a2a;
+      padding: 10px 12px;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: all 0.2s;
+      line-height: 1.2;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #388e3c);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #b71c1c, var(--danger));
+      color: #fff;
+    }
+
+    .btn-ai {
+      background: linear-gradient(135deg, #4a148c, #7b1fa2);
+      color: #fff;
+    }
+
+    .btn-sim {
+      background: linear-gradient(135deg, #006064, #00838f);
+      color: #fff;
+    }
+
+    .btn-sim-on {
+      background: linear-gradient(135deg, #00acc1, #26c6da);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(38,198,218,0.6);
+    }
+
+    .btn-reset {
+      background: rgba(255,255,255,0.08);
+      color: var(--text-muted);
+      border: 1px solid #2a3a2a;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+      opacity: 0.85;
+    }
+
+    /* Save Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: flex-end;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 20px 16px 32px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal h3 {
+      font-size: 1rem;
+      color: var(--accent-bright);
+      text-align: center;
+    }
+
+    .result-toggle {
+      display: flex;
+      gap: 8px;
+    }
+
+    .result-btn {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+
+    .result-btn.miss {
+      background: rgba(239, 83, 80, 0.15);
+      border-color: #ef5350;
+      color: #ef9a9a;
+    }
+
+    .result-btn.success {
+      background: rgba(67, 160, 71, 0.15);
+      border-color: #43a047;
+      color: #a5d6a7;
+    }
+
+    .result-btn.selected {
+      opacity: 1;
+    }
+
+    .result-btn:not(.selected) {
+      opacity: 0.4;
+    }
+
+    .memo-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid #2a3a2a;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      resize: none;
+      height: 70px;
+      outline: none;
+    }
+
+    .memo-input::placeholder { color: var(--text-muted); }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-cancel {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-muted);
+      border: 1px solid #2a3a2a;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn-confirm {
+      flex: 1;
+      background: linear-gradient(135deg, var(--success), #388e3c);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(30,50,30,0.95);
+      border: 1px solid var(--accent);
+      color: var(--accent-bright);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 200;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================
+       HISTORY VIEW
+    ========================================== */
+    #view-history {
+      overflow-y: auto;
+      padding: 12px;
+      gap: 8px;
+    }
+
+    .history-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      opacity: 0.6;
+    }
+
+    .history-empty .icon { font-size: 3rem; }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+      align-items: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .history-card:active {
+      background: #1e3a1e;
+      border-color: var(--accent);
+    }
+
+    .hc-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .result-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .badge-miss { background: #ef5350; color: #fff; }
+    .badge-success { background: #43a047; color: #fff; }
+
+    .hc-date {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .hc-stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hc-stat {
+      font-size: 0.75rem;
+      color: var(--accent-bright);
+    }
+
+    .hc-stat span {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+    }
+
+    .hc-memo {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-style: italic;
+      grid-column: 1 / -1;
+    }
+
+    .hc-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .btn-sm-load {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-sm-del {
+      background: rgba(239, 83, 80, 0.2);
+      color: #ef5350;
+      border: 1px solid #ef5350;
+    }
+
+    .history-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0 4px 0;
+      flex-shrink: 0;
+    }
+
+    .history-header-bar h2 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .btn-clear-all {
+      background: transparent;
+      border: 1px solid #ef5350;
+      color: #ef5350;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+
+    /* ==========================================
+       BOWLLIARD VIEW
+    ========================================== */
+    #view-bowlliard {
+      overflow-y: auto;
+      padding: 12px;
+      gap: 12px;
+    }
+
+    .bowl-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent-bright);
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    /* スコアシート */
+    .score-sheet {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      overflow-x: auto;
+    }
+
+    .score-frames {
+      display: flex;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .score-frame {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .score-frame.frame-10 { flex: 1.5; }
+
+    .frame-label {
+      font-size: 0.58rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 3px 0 2px;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .frame-rolls {
+      display: flex;
+      gap: 2px;
+      padding: 4px 3px 3px;
+      justify-content: center;
+    }
+
+    .roll-cell {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .roll-cell:active { transform: scale(0.92); }
+
+    .roll-cell.active-input {
+      border-color: var(--accent);
+      background: rgba(102,187,106,0.18);
+      color: #fff;
+      box-shadow: 0 0 8px rgba(102,187,106,0.4);
+    }
+
+    .roll-cell.strike { color: #ff6b6b; border-color: rgba(255,107,107,0.5); }
+    .roll-cell.spare  { color: #ffd93d; border-color: rgba(255,217,61,0.5); }
+    .roll-cell.disabled {
+      opacity: 0.25;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .frame-score {
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-bright);
+      padding: 4px 2px 5px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      min-height: 22px;
+    }
+
+    /* テンキー */
+    .numpad-overlay {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg-card2);
+      border-top: 2px solid var(--accent);
+      padding: 10px 8px 16px;
+      z-index: 50;
+      transform: translateY(100%);
+      transition: transform 0.22s ease;
+    }
+    .numpad-overlay.open { transform: translateY(0); }
+
+    .numpad-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .numpad-btn {
+      padding: 14px 4px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.09);
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .numpad-btn:active { background: var(--accent); color: #fff; transform: scale(0.94); }
+    .numpad-btn.numpad-del { background: rgba(239,83,80,0.18); color: #ef5350; }
+    .numpad-btn.numpad-close { background: rgba(102,187,106,0.18); color: var(--accent); grid-column: span 2; }
+
+    /* 総合スコア表示 */
+    .bowl-total-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+    }
+    .bowl-total-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+    .bowl-total-score { font-size: 2rem; font-weight: 800; color: var(--accent-bright); }
+
+    .bowl-action-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* 履歴カード: ボーラード */
+    .history-card-bowl {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid rgba(102,187,106,0.15);
+    }
+    .bowl-card-score {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--accent-bright);
+      line-height: 1;
+    }
+    .bowl-card-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .bowl-card-date { font-size: 0.72rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header>
+  <div class="header-title">ビリヤードノート</div>
+  <div class="tab-group">
+    <button class="tab-btn active" id="tab-table" onclick="switchView('table')">台</button>
+    <button class="tab-btn" id="tab-bowlliard" onclick="switchView('bowlliard')">ボーラード</button>
+    <button class="tab-btn" id="tab-history" onclick="switchView('history')">記録</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ========== TABLE VIEW ========== -->
+  <div id="view-table" class="view active">
+
+    <!-- Ball & Pocket Selector -->
+    <div class="ball-selector">
+      <div class="selector-row">
+        <div class="selector-label">配置する球</div>
+        <div class="ball-options">
+          <button class="ball-opt selected" id="opt-cue" onclick="selectBallType('cue')">
+            <div class="ball-circle cue"></div>手球
+          </button>
+          <button class="ball-opt" id="opt-red" onclick="selectBallType('red')">
+            <div class="ball-circle ball-red"></div>的球
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrapper">
+      <canvas id="billiards-canvas"></canvas>
+    </div>
+
+    <!-- Stats + Spin Selector -->
+    <div class="stats-spin-row">
+      <div class="stats-panel">
+        <div class="stat-item">
+          <div class="stat-label">手球→的球の距離</div>
+          <div class="stat-value" id="stat-dist-cb">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">的球→ポケット距離</div>
+          <div class="stat-value" id="stat-dist-pocket">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">カット角</div>
+          <div class="stat-value" id="stat-cut-angle">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">振り</div>
+          <div class="stat-value" id="stat-side">—</div>
+        </div>
+      </div>
+      <!-- Spin Selector -->
+      <div class="spin-selector">
+        <div class="spin-label">撞点</div>
+        <canvas id="spin-canvas"></canvas>
+        <div class="spin-value" id="spin-value-text">中心</div>
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <button class="btn btn-reset" onclick="resetTable()">リセット</button>
+      <button class="btn btn-sim" id="btn-sim" onclick="toggleSimulation()">🎯 シミュ</button>
+      <button class="btn btn-danger" onclick="openSaveModal('miss')">ミス</button>
+      <button class="btn btn-success" onclick="openSaveModal('success')">成功</button>
+      <button class="btn btn-ai" onclick="copyAIText()">AI相談</button>
+    </div>
+  </div>
+
+  <!-- ========== BOWLLIARD VIEW ========== -->
+  <div id="view-bowlliard" class="view">
+    <div class="bowl-title">🎳 ボーラード スコア</div>
+
+    <!-- スコアシート -->
+    <div class="score-sheet">
+      <div class="score-frames" id="score-frames"></div>
+    </div>
+
+    <!-- 合計スコア -->
+    <div class="bowl-total-row">
+      <div>
+        <div class="bowl-total-label">TOTAL SCORE</div>
+      </div>
+      <div class="bowl-total-score" id="bowl-total">0</div>
+    </div>
+
+    <!-- アクションバー -->
+    <div class="bowl-action-bar">
+      <button class="btn btn-reset" onclick="resetBowlliard()" style="flex:1">リセット</button>
+      <button class="btn btn-success" onclick="saveBowlliard()" style="flex:2">スコアを保存</button>
+    </div>
+  </div>
+
+  <!-- ========== HISTORY VIEW ========== -->
+  <div id="view-history" class="view">
+    <div class="history-header-bar">
+      <h2>保存された記録</h2>
+      <button class="btn-clear-all" onclick="clearAllHistory()">全削除</button>
+    </div>
+    <div id="history-content"></div>
+  </div>
+
+</main>
+
+<!-- ========== SAVE MODAL ========== -->
+<div class="modal-overlay" id="save-modal">
+  <div class="modal">
+    <h3>配置を記録する</h3>
+    <div class="result-toggle">
+      <button class="result-btn miss selected" id="modal-miss-btn" onclick="setModalResult('miss')">❌ ミス</button>
+      <button class="result-btn success" id="modal-success-btn" onclick="setModalResult('success')">✅ 成功</button>
+    </div>
+    <textarea class="memo-input" id="modal-memo" placeholder="メモを入力（省略可）"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSaveModal()">キャンセル</button>
+      <button class="btn-confirm" onclick="saveRecord()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Numpad Overlay for Bowlliard -->
+<div class="numpad-overlay" id="numpad-overlay">
+  <div class="numpad-hint" id="numpad-hint">フレーム – 投目を入力</div>
+  <div class="numpad-grid" id="numpad-grid"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const STATE = {
+  selectedBallType: 'cue',  // 'cue' | 'red'
+  cueBall: null,            // {x, y} in canvas coords
+  objectBall: null,         // {x, y}
+  dragging: null,           // 'cue' | 'object' | 'aim' | null
+  modalResult: 'miss',
+  simulating: false,        // shot simulation overlay on/off
+  aimAngle: null,           // ラジアン: 手球から見た照準方向（null=的球方向がデフォルト）
+  lastEnteredPocket: null,  // 直近シミュで的球が入ったポケットのインデックス
+  spin: { x: 0, y: 0 },    // 撞点: x=横(-1左〜+1右), y=縦(-1引き〜+1押し)
+};
+
+/* ============================================================
+   POCKET NAMES & POSITIONS
+   Pockets are numbered 0..5:
+     0=TopLeft, 1=TopCenter, 2=TopRight
+     3=BottomLeft, 4=BottomCenter, 5=BottomRight
+============================================================ */
+const POCKET_NAMES = ['左上', '中上', '右上', '左下', '中下', '右下'];
+
+/* ============================================================
+   CANVAS SETUP
+============================================================ */
+const canvas = document.getElementById('billiards-canvas');
+const ctx = canvas.getContext('2d');
+
+// Table layout constants (relative to canvas)
+let TABLE = {}; // populated in resize()
+
+function resizeCanvas() {
+  const wrapper = canvas.parentElement;
+  const wrapW = wrapper.clientWidth;
+  const wrapH = wrapper.clientHeight;
+
+  // Table aspect ratio 2:1 (width:height)
+  // We add cushion margins around the playfield
+  const CUSHION = 22; // px
+
+  let fieldW, fieldH;
+  if (wrapW / wrapH > 2) {
+    fieldH = wrapH - CUSHION * 2 - 20;
+    fieldW = fieldH * 2;
+  } else {
+    fieldW = wrapW - CUSHION * 2 - 8;
+    fieldH = fieldW / 2;
+  }
+
+  fieldW = Math.floor(fieldW);
+  fieldH = Math.floor(fieldH);
+
+  const canvasW = fieldW + CUSHION * 2;
+  const canvasH = fieldH + CUSHION * 2;
+
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+
+  // -------------------------
+  // Realistic pocket sizing
+  // Real 9ft table: playing surface 2540mm wide, ball ø57.2mm
+  //   Corner pocket opening: ~114mm  → ratio ≈ 0.0449  (radius ≈ 0.0224)
+  //   Side   pocket opening: ~127mm  → ratio ≈ 0.0500  (radius ≈ 0.0250)
+  // Compared to ball radius (0.01126 of width):
+  //   cornerR ≈ ballR * 1.99  ≈ 2× ball radius
+  //   sideR   ≈ ballR * 2.22  ≈ 2.2× ball radius
+  // -------------------------
+  const ballR = Math.max(6, fieldW * 0.01126);
+  TABLE = {
+    cushion: CUSHION,
+    x: CUSHION,
+    y: CUSHION,
+    w: fieldW,
+    h: fieldH,
+    cornerPocketR: Math.max(10, ballR * 2.0),
+    sidePocketR:   Math.max(11, ballR * 2.2),
+  };
+
+  // Pocket positions [x, y] relative to canvas.
+  // Index: 0=TL, 1=TC, 2=TR, 3=BL, 4=BC, 5=BR
+  TABLE.pockets = [
+    [TABLE.x,              TABLE.y             ],  // 0 TL  corner
+    [TABLE.x + TABLE.w/2,  TABLE.y             ],  // 1 TC  side
+    [TABLE.x + TABLE.w,    TABLE.y             ],  // 2 TR  corner
+    [TABLE.x,              TABLE.y + TABLE.h   ],  // 3 BL  corner
+    [TABLE.x + TABLE.w/2,  TABLE.y + TABLE.h   ],  // 4 BC  side
+    [TABLE.x + TABLE.w,    TABLE.y + TABLE.h   ],  // 5 BR  corner
+  ];
+  // Which pocket indices are "side" (larger) vs "corner" (smaller)
+  TABLE.isSide = [false, true, false, false, true, false];
+
+  draw();
+}
+
+/* ============================================================
+   DRAW
+============================================================ */
+function getPocketR(i) {
+  return TABLE.isSide[i] ? TABLE.sidePocketR : TABLE.cornerPocketR;
+}
+
+function draw() {
+  const { x, y, w, h, cushion, pockets } = TABLE;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // --- Outer cushion frame ---
+  ctx.fillStyle = '#6b3410';
+  roundRect(ctx, 0, 0, canvas.width, canvas.height, 10);
+  ctx.fill();
+
+  // --- Cushion highlight ---
+  ctx.fillStyle = '#8B4513';
+  roundRect(ctx, 1, 1, canvas.width - 2, canvas.height - 2, 9);
+  ctx.fill();
+
+  // --- Felt (green playfield) ---
+  ctx.fillStyle = '#2e7d4f';
+  ctx.fillRect(x, y, w, h);
+
+  // Felt grain texture (subtle lines)
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for (let ly = y; ly < y + h; ly += 6) {
+    ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x + w, ly); ctx.stroke();
+  }
+
+  // --- Diamonds (markers on rails) ---
+  drawDiamonds();
+
+  // --- Pockets ---
+  pockets.forEach((p, i) => {
+    const pR = getPocketR(i);
+    // Dark pit
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], pR, 0, Math.PI * 2);
+    ctx.fillStyle = '#080808';
+    ctx.fill();
+    // Inner gradient for depth
+    const pg = ctx.createRadialGradient(p[0]-pR*0.2, p[1]-pR*0.2, pR*0.1, p[0], p[1], pR);
+    pg.addColorStop(0, 'rgba(50,50,50,0.3)');
+    pg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pg;
+    ctx.fill();
+    // Rim highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // --- Simulation overlay ---
+  if (STATE.simulating) drawSimulation();
+
+  // --- Ghost ball line (cue → object), shown when NOT simulating ---
+  if (!STATE.simulating && STATE.cueBall && STATE.objectBall) {
+    ctx.beginPath();
+    ctx.moveTo(STATE.cueBall.x, STATE.cueBall.y);
+    ctx.lineTo(STATE.objectBall.x, STATE.objectBall.y);
+    ctx.strokeStyle = 'rgba(200,200,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // --- Object Ball ---
+  if (STATE.objectBall) {
+    drawBall(STATE.objectBall.x, STATE.objectBall.y, getBallRadius(), '#e53935', null);
+  }
+
+  // --- Cue Ball ---
+  if (STATE.cueBall) {
+    drawBall(STATE.cueBall.x, STATE.cueBall.y, getBallRadius(), '#f5f5f0', '#ccc');
+  }
+
+  // Update stats
+  updateStats();
+}
+
+/* ============================================================
+   SHOT SIMULATION
+
+   Shows a full trajectory overlay when simulating = true:
+
+   1. CB approach line  (from CB to ghost ball contact point)
+   2. Ghost ball        (semi-transparent white circle at contact)
+   3. OB trajectory    (from OB toward pocket, with cushion reflections)
+   4. CB deflection    (stun-shot 90° from OB, with cushion reflections)
+
+   Trajectory tracing uses raytrace() which bounces off cushion walls.
+============================================================ */
+
+/**
+ * Trace a ray from (ox, oy) in direction (dvx, dvy) inside the table field,
+ * reflecting off cushions up to `maxBounces` times.
+ * Returns an array of {x, y} points forming the path.
+ * Stops early if the ray passes within `stopRadius` of any stopTarget {x,y}.
+ *
+ * Physical accuracy notes:
+ *  - A ball of radius bR bounces when its CENTER reaches bR from the cushion face.
+ *    So the effective bounce walls are inset by bR from the field boundary.
+ *  - Pocket capture: the ball (center) enters a pocket when center-to-pocket-center
+ *    distance < (pocketR - bR). We use (stopRadius - bR) for the target pocket and
+ *    a tighter threshold for incidental pockets to avoid false positives.
+ */
+function raytrace(ox, oy, dvx, dvy, maxBounces, stopRadius, stopTarget, spinX) {
+  const { x: fx, y: fy, w: fw, h: fh } = TABLE;
+  const ballR = getBallRadius();
+  const sx = spinX || 0; // ひねり量 -1〜+1
+
+  // Effective bounce walls: ball center stays bR away from cushion face
+  const left   = fx + ballR;
+  const right  = fx + fw - ballR;
+  const top    = fy + ballR;
+  const bottom = fy + fh - ballR;
+
+  const pts = [{ x: ox, y: oy }];
+  let cx = ox, cy = oy, vx = dvx, vy = dvy;
+
+  // Pocket capture thresholds (ball center distance to pocket center)
+  //   Target pocket  : capture when center is within (pocketR - bR)
+  //   Other pockets  : use a small threshold so only a nearly-center shot stops here
+  const targetCaptureR = Math.max(ballR * 0.5, stopRadius - ballR);
+  const incidentalR    = ballR * 1.6;
+
+  const pocketStops = TABLE.pockets.map((p) => ({
+    x: p[0], y: p[1],
+    r: incidentalR,
+  }));
+
+  function checkSegmentForStop(sx, sy, ex, ey) {
+    // Check explicit stopTarget (target pocket) first
+    if (stopTarget) {
+      const segLen2 = (ex - sx) ** 2 + (ey - sy) ** 2;
+      if (segLen2 > 0) {
+        const t = Math.max(0, Math.min(1,
+          ((stopTarget.x - sx) * (ex - sx) + (stopTarget.y - sy) * (ey - sy)) / segLen2));
+        const closeX = sx + t * (ex - sx);
+        const closeY = sy + t * (ey - sy);
+        const d2 = (closeX - stopTarget.x) ** 2 + (closeY - stopTarget.y) ** 2;
+        if (d2 <= targetCaptureR * targetCaptureR) {
+          // Interpolate to the exact capture point on the segment
+          const capT = Math.max(0, Math.min(1, t));
+          return { x: sx + capT * (ex - sx), y: sy + capT * (ey - sy) };
+        }
+      }
+    }
+    // Check incidental pockets
+    for (const pk of pocketStops) {
+      const segLen2 = (ex - sx) ** 2 + (ey - sy) ** 2;
+      if (segLen2 === 0) continue;
+      const t = Math.max(0, Math.min(1,
+        ((pk.x - sx) * (ex - sx) + (pk.y - sy) * (ey - sy)) / segLen2));
+      const closeX = sx + t * (ex - sx);
+      const closeY = sy + t * (ey - sy);
+      const d2 = (closeX - pk.x) ** 2 + (closeY - pk.y) ** 2;
+      if (d2 <= pk.r * pk.r) {
+        return { x: closeX, y: closeY };
+      }
+    }
+    return null;
+  }
+
+  for (let b = 0; b <= maxBounces; b++) {
+    // --- すり抜け防止：壁に密着かつ壁方向への速度がある場合、即座に反射させる ---
+    if (cx >= right  - 1e-5 && vx > 0) vx = -vx;
+    if (cx <= left   + 1e-5 && vx < 0) vx = -vx;
+    if (cy >= bottom - 1e-5 && vy > 0) vy = -vy;
+    if (cy <= top    + 1e-5 && vy < 0) vy = -vy;
+
+    let tMin = Infinity;
+    let hitWall = null;
+
+    if (vx > 0)  { const t = (right  - cx) / vx; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'right';  } }
+    if (vx < 0)  { const t = (left   - cx) / vx; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'left';   } }
+    if (vy > 0)  { const t = (bottom - cy) / vy; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'bottom'; } }
+    if (vy < 0)  { const t = (top    - cy) / vy; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'top';    } }
+
+    if (!hitWall) break;
+
+    const nx = cx + vx * tMin;
+    const ny = cy + vy * tMin;
+
+    // Check pocket capture before reaching the wall
+    const hit = checkSegmentForStop(cx, cy, nx, ny);
+    if (hit) {
+      pts.push(hit);
+      return pts;
+    }
+
+    pts.push({ x: nx, y: ny });
+
+    if (b === maxBounces) break;
+
+    // 通常反射
+    if (hitWall === 'left' || hitWall === 'right') vx = -vx;
+    else vy = -vy;
+
+    // ひねりによる反射角変化（角度回転方式）
+    // 入射角に比例した角度変化でクランプし、浅い入射でも破綻しない
+    if (sx !== 0) {
+      const SPIN_MAX_ANGLE = 14 * Math.PI / 180; // 最大±14度
+      const isLR = hitWall === 'left' || hitWall === 'right';
+      const incidentAngle = isLR
+        ? Math.atan2(Math.abs(vy), Math.abs(vx))
+        : Math.atan2(Math.abs(vx), Math.abs(vy));
+      const angleFactor = Math.sin(incidentAngle);
+      const deltaAngle = sx * SPIN_MAX_ANGLE * angleFactor;
+      const cosD = Math.cos(deltaAngle), sinD = Math.sin(deltaAngle);
+      const nvx = vx * cosD - vy * sinD;
+      const nvy = vx * sinD + vy * cosD;
+      const mag = Math.sqrt(nvx*nvx + nvy*nvy);
+      if (mag > 0) { vx = nvx / mag; vy = nvy / mag; }
+    }
+
+    cx = nx;
+    cy = ny;
+  }
+
+  return pts;
+}
+
+/**
+ * OB専用: 全ポケットのどれかに入ったら停止するraytrace。
+ * 返り値: { pts: [{x,y}...], pocketIndex: number|null }
+ *   pocketIndex: 入ったポケットのインデックス（入らなかった場合はnull）
+ */
+function raytraceAllPockets(ox, oy, dvx, dvy, maxBounces) {
+  const { x: fx, y: fy, w: fw, h: fh } = TABLE;
+  const ballR = getBallRadius();
+
+  const left   = fx + ballR;
+  const right  = fx + fw - ballR;
+  const top    = fy + ballR;
+  const bottom = fy + fh - ballR;
+
+  const pts = [{ x: ox, y: oy }];
+  let cx = ox, cy = oy, vx = dvx, vy = dvy;
+
+  const pocketCaptures = TABLE.pockets.map((p, i) => ({
+    x: p[0], y: p[1],
+    r: Math.max(ballR * 1.6, getPocketR(i) * 0.85),
+    index: i,
+  }));
+
+  function checkPockets(sx, sy, ex, ey) {
+    for (const pk of pocketCaptures) {
+      const segLen2 = (ex - sx) ** 2 + (ey - sy) ** 2;
+      if (segLen2 === 0) continue;
+      const t = Math.max(0, Math.min(1,
+        ((pk.x - sx) * (ex - sx) + (pk.y - sy) * (ey - sy)) / segLen2));
+      const closeX = sx + t * (ex - sx);
+      const closeY = sy + t * (ey - sy);
+      if ((closeX - pk.x) ** 2 + (closeY - pk.y) ** 2 <= pk.r * pk.r) {
+        return { x: closeX, y: closeY, pocketIndex: pk.index };
+      }
+    }
+    return null;
+  }
+
+  for (let b = 0; b <= maxBounces; b++) {
+    // --- すり抜け防止：壁に密着かつ壁方向への速度がある場合、即座に反射させる ---
+    if (cx >= right  - 1e-5 && vx > 0) vx = -vx;
+    if (cx <= left   + 1e-5 && vx < 0) vx = -vx;
+    if (cy >= bottom - 1e-5 && vy > 0) vy = -vy;
+    if (cy <= top    + 1e-5 && vy < 0) vy = -vy;
+
+    let tMin = Infinity;
+    let hitWall = null;
+
+    if (vx > 0)  { const t = (right  - cx) / vx; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'right';  } }
+    if (vx < 0)  { const t = (left   - cx) / vx; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'left';   } }
+    if (vy > 0)  { const t = (bottom - cy) / vy; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'bottom'; } }
+    if (vy < 0)  { const t = (top    - cy) / vy; if (t > 1e-6 && t < tMin) { tMin = t; hitWall = 'top';    } }
+
+    if (!hitWall) break;
+
+    const nx = cx + vx * tMin;
+    const ny = cy + vy * tMin;
+
+    const hit = checkPockets(cx, cy, nx, ny);
+    if (hit) {
+      pts.push({ x: hit.x, y: hit.y });
+      return { pts, pocketIndex: hit.pocketIndex };
+    }
+
+    pts.push({ x: nx, y: ny });
+    if (b === maxBounces) break;
+
+    if (hitWall === 'left' || hitWall === 'right') vx = -vx;
+    else vy = -vy;
+
+    cx = nx;
+    cy = ny;
+  }
+
+  return { pts, pocketIndex: null };
+}
+
+/** Draw a multi-segment trajectory path with optional dashes. */
+function drawTrajectoryPath(pts, color, lineWidth, dash) {
+  if (pts.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.setLineDash(dash || []);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Arrow: draw slightly inset from the last point so it doesn't poke through cushion
+  if (pts.length >= 2) {
+    const last = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    const dx = last.x - prev.x, dy = last.y - prev.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 1) {
+      const inset = Math.min(getBallRadius(), len * 0.5);
+      const ax = last.x - (dx / len) * inset;
+      const ay = last.y - (dy / len) * inset;
+      drawArrow(prev.x, prev.y, ax, ay, color.replace(/[\d.]+\)$/, '1)'), 10);
+    }
+  }
+}
+
+// Aim Target の表示位置（手球から一定距離、aimAngle方向）
+const AIM_TARGET_DIST = 40; // px: CBからAimTargetまでの表示距離
+
+function getAimTargetPos(cb, ob) {
+  // aimAngleが未設定の場合はCB→OB方向をデフォルトにする
+  const angle = STATE.aimAngle !== null
+    ? STATE.aimAngle
+    : Math.atan2(ob.y - cb.y, ob.x - cb.x);
+  return {
+    x: cb.x + Math.cos(angle) * AIM_TARGET_DIST,
+    y: cb.y + Math.sin(angle) * AIM_TARGET_DIST,
+  };
+}
+
+/**
+ * 線分 (sx,sy)→(ex,ey) と、中心(cx,cy)・半径r の円の交差判定。
+ * 交差する場合、線分の始点に最も近い交点のパラメータt∈[0,1]を返す。
+ * 交差しない場合はnullを返す。
+ */
+function segmentCircleIntersect(sx, sy, ex, ey, cx, cy, r) {
+  const dx = ex - sx, dy = ey - sy;
+  const fx = sx - cx, fy = sy - cy;
+  const a = dx*dx + dy*dy;
+  if (a < 1e-12) return null; // 長さゼロのセグメント
+  const b = 2 * (fx*dx + fy*dy);
+  const c = fx*fx + fy*fy - r*r;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const sqrtDisc = Math.sqrt(disc);
+  const t1 = (-b - sqrtDisc) / (2*a);
+  const t2 = (-b + sqrtDisc) / (2*a);
+  // 線分内（0 ≤ t ≤ 1）かつ前方の最小tを返す
+  const candidates = [t1, t2].filter(t => t >= 0 && t <= 1);
+  if (candidates.length === 0) return null;
+  return Math.min(...candidates);
+}
+
+/**
+ * 空クッション対応のゴーストボール計算。
+ * CBがaimVec方向に進み、クッション反射を最大maxBounces回行う軌道の
+ * 各セグメントに対して線分-円交差判定を行い、最初に当たる点を返す。
+ * 返り値: { ghost: {x,y}, cbPathPts: [{x,y},...], segIndex: number } | null
+ *   ghost      : ゴーストボールの座標
+ *   cbPathPts  : CBがゴーストボールに到達するまでの経路点列
+ *   segIndex   : 当たったセグメントのインデックス
+ */
+function calcGhostBallWithBanks(cb, ob, aimVec, bR, maxBounces) {
+  const { x: fx, y: fy, w: fw, h: fh } = TABLE;
+  const left   = fx + bR, right  = fx + fw - bR;
+  const top    = fy + bR, bottom = fy + fh - bR;
+
+  let cx = clampToField(cb).x, cy = clampToField(cb).y;
+  let vx = aimVec.x, vy = aimVec.y;
+  const SEGMENT_LEN = Math.max(fw, fh) * 3;
+
+  // CB経路の頂点リスト（スタート点から順に追加）
+  const pathPts = [{ x: cx, y: cy }];
+
+  for (let b = 0; b <= maxBounces; b++) {
+    // --- すり抜け防止 ---
+    if (cx >= right  - 1e-5 && vx > 0) vx = -vx;
+    if (cx <= left   + 1e-5 && vx < 0) vx = -vx;
+    if (cy >= bottom - 1e-5 && vy > 0) vy = -vy;
+    if (cy <= top    + 1e-5 && vy < 0) vy = -vy;
+
+    let tWall = Infinity, hitWall = null;
+    if (vx > 0) { const t = (right  - cx) / vx; if (t > 1e-6 && t < tWall) { tWall = t; hitWall = 'right';  } }
+    if (vx < 0) { const t = (left   - cx) / vx; if (t > 1e-6 && t < tWall) { tWall = t; hitWall = 'left';   } }
+    if (vy > 0) { const t = (bottom - cy) / vy; if (t > 1e-6 && t < tWall) { tWall = t; hitWall = 'bottom'; } }
+    if (vy < 0) { const t = (top    - cy) / vy; if (t > 1e-6 && t < tWall) { tWall = t; hitWall = 'top';    } }
+
+    const ex = cx + vx * (hitWall ? tWall : SEGMENT_LEN);
+    const ey = cy + vy * (hitWall ? tWall : SEGMENT_LEN);
+
+    // このセグメントでOBに当たるか判定
+    const t = segmentCircleIntersect(cx, cy, ex, ey, ob.x, ob.y, 2 * bR);
+    if (t !== null) {
+      const gx = cx + (ex - cx) * t;
+      const gy = cy + (ey - cy) * t;
+      return {
+        ghost: { x: gx, y: gy },
+        cbPathPts: [...pathPts, { x: gx, y: gy }],
+        segIndex: b,
+      };
+    }
+
+    if (!hitWall) break;
+
+    // 壁まで進んで反射
+    cx = ex; cy = ey;
+    pathPts.push({ x: cx, y: cy });
+    if (vx !== vx) break; // NaN guard
+    if (hitWall === 'left' || hitWall === 'right') vx = -vx;
+    else vy = -vy;
+  }
+
+  return null;
+}
+
+function drawSimulation() {
+  const cb = STATE.cueBall;
+  const ob = STATE.objectBall;
+  if (!cb || !ob) return;
+
+  const bR = getBallRadius();
+  const pockets = TABLE.pockets;
+
+  function normalize(vx, vy) {
+    const m = Math.sqrt(vx * vx + vy * vy);
+    return m === 0 ? { x: 0, y: 0 } : { x: vx / m, y: vy / m };
+  }
+
+  // ---- 照準方向ベクトル ----
+  const aimTarget = getAimTargetPos(cb, ob);
+  const aimVec = normalize(aimTarget.x - cb.x, aimTarget.y - cb.y);
+
+  // ---- Aim Target マークの描画 ----
+  const atR = bR * 0.7;
+  ctx.beginPath();
+  ctx.arc(aimTarget.x, aimTarget.y, atR, 0, Math.PI * 2);
+  ctx.strokeStyle = STATE.dragging === 'aim'
+    ? 'rgba(100,220,255,1.0)' : 'rgba(100,220,255,0.75)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(100,220,255,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(aimTarget.x - atR * 1.6, aimTarget.y);
+  ctx.lineTo(aimTarget.x + atR * 1.6, aimTarget.y);
+  ctx.moveTo(aimTarget.x, aimTarget.y - atR * 1.6);
+  ctx.lineTo(aimTarget.x, aimTarget.y + atR * 1.6);
+  ctx.stroke();
+
+  // ---- 空クッション対応ゴーストボール計算 ----
+  const hitResult = calcGhostBallWithBanks(cb, ob, aimVec, bR, 4);
+
+  if (hitResult === null) {
+    // ===== B: 空振り — 手球がそのまま反射しながら進む =====
+    const cbPts = raytrace(clampToField(cb).x, clampToField(cb).y, aimVec.x, aimVec.y, 4, 0, null, STATE.spin.x);
+    drawTrajectoryPath(cbPts, 'rgba(150, 200, 255, 0.75)', 2, [6, 4]);
+    STATE.lastEnteredPocket = null;
+
+  } else {
+    // ===== A: 的球に当たる =====
+    const ghost = hitResult.ghost;
+    const cbPathPts = hitResult.cbPathPts;
+
+    // ---- CB進入経路（CB → [バンク点...] → ゴーストボール）----
+    // cbPathPts は [CB開始点, ..., ゴーストボール] の経路
+    ctx.beginPath();
+    ctx.moveTo(cbPathPts[0].x, cbPathPts[0].y);
+    for (let i = 1; i < cbPathPts.length; i++) ctx.lineTo(cbPathPts[i].x, cbPathPts[i].y);
+    ctx.strokeStyle = 'rgba(150, 200, 255, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // 最後のセグメントに矢印
+    if (cbPathPts.length >= 2) {
+      const last = cbPathPts[cbPathPts.length - 1];
+      const prev = cbPathPts[cbPathPts.length - 2];
+      drawArrow(prev.x, prev.y, last.x, last.y, 'rgba(150,200,255,0.95)', 10);
+    }
+    // バンク点をマーク
+    for (let i = 1; i < cbPathPts.length - 1; i++) {
+      ctx.beginPath();
+      ctx.arc(cbPathPts[i].x, cbPathPts[i].y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(150,200,255,0.7)';
+      ctx.fill();
+    }
+
+    // ---- ゴーストボール描画 ----
+    ctx.beginPath();
+    ctx.arc(ghost.x, ghost.y, bR, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(200,220,255,0.15)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,220,255,0.80)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(ghost.x, ghost.y, bR * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(150,210,255,0.65)';
+    ctx.fill();
+
+    // ---- 接触法線と入射方向（バンク後の最終セグメント方向を使う）----
+    const contactNorm = normalize(ob.x - ghost.x, ob.y - ghost.y);
+    // CBの最終入射方向：ゴーストボール直前の経路セグメント方向
+    const prevPt  = cbPathPts[cbPathPts.length - 2];
+    const inVec = normalize(ghost.x - prevPt.x, ghost.y - prevPt.y);
+
+    // dotCB: 入射方向と接触法線の内積（厚み指標、正面=1、薄い=0に近い）
+    const dotCB = Math.max(0, inVec.x * contactNorm.x + inVec.y * contactNorm.y);
+
+    // ---- スロウ計算: CIT（カット起因）+ SIT（ひねり起因）を合成 ----
+    //
+    // CIT (Cut Induced Throw):
+    //   カット角が大きいほど摩擦で的球が厚い方向へズレる（最大3度）
+    //   薄い = dotCB小 → CIT大。ただし完全な薄撃ちは摩擦が少ないため頭打ち
+    //   CIT方向: contactNorm に対して、inVec側(厚い方向)へ引き寄せる
+    //   2D的には「inVecとcontactNormのcross」の符号で左右を決定
+    const CIT_MAX_DEG = 3.0;
+    const citStrength = Math.sqrt(1 - dotCB * dotCB); // カット角のsin（厚み0=1, 正面=0）
+    const citFade     = Math.min(1, citStrength * 2.5); // 非常に薄い場合は減衰
+    const crossCB = inVec.x * contactNorm.y - inVec.y * contactNorm.x; // 2Dcross
+    const citAngle = citStrength * citFade * CIT_MAX_DEG * (Math.PI / 180) * Math.sign(crossCB);
+
+    // SIT (Spin Induced Throw):
+    //   右ひねり(spin.x > 0) → 的球は左にズレ（負方向）
+    //   順ひねりはCITを打ち消す（CITと逆符号）、逆ひねりは増幅（同符号）
+    const SIT_MAX_DEG = 4.0;
+    const sitAngle = -STATE.spin.x * (SIT_MAX_DEG * Math.PI / 180);
+
+    // 合成スロウ角: CIT + SIT
+    const totalThrowAngle = citAngle + sitAngle;
+    const cosT = Math.cos(totalThrowAngle), sinT = Math.sin(totalThrowAngle);
+    const obDirX = contactNorm.x * cosT - contactNorm.y * sinT;
+    const obDirY = contactNorm.x * sinT + contactNorm.y * cosT;
+    const obDir = normalize(obDirX, obDirY);
+
+    // ---- カット角（最終入射方向と接触法線の角度）----
+    const cutCos = Math.max(-1, Math.min(1, inVec.x * contactNorm.x + inVec.y * contactNorm.y));
+    const cutDeg = Math.round(Math.acos(cutCos) * 180 / Math.PI);
+    if (cutDeg > 2) {
+      ctx.font = `bold ${Math.max(10, TABLE.w * 0.026)}px sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(100,220,255,0.95)';
+      // テキスト位置: ゴーストボール右側を基本とし、手球・的球と重ならないようY調整
+      const txtX = ghost.x + bR + 4;
+      let txtY = ghost.y;
+      const checkPts = [cb, ob, ghost];
+      const txtW = ctx.measureText(`${cutDeg}°カット`).width;
+      const txtH = 16;
+      for (const pt of checkPts) {
+        const dx = txtX + txtW / 2 - pt.x;
+        const dy = txtY - pt.y;
+        if (Math.sqrt(dx*dx + dy*dy) < bR * 2.5 + txtH) {
+          // 重なりそうなら上か下にずらす（上方向を優先）
+          txtY = (ghost.y - pt.y > 0) ? ghost.y + bR + 18 : ghost.y - bR - 18;
+          break;
+        }
+      }
+      ctx.fillText(`${cutDeg}°カット`, txtX, txtY);
+    }
+
+    // ---- OB軌跡（obDir方向・スロウ補正+バンクショット対応）----
+    const obStart = clampToField(ob);
+    const obResult = raytraceAllPockets(obStart.x, obStart.y, obDir.x, obDir.y, 4);
+    const obPts = obResult.pts;
+    drawTrajectoryPath(obPts, 'rgba(255, 210, 50, 0.88)', 2.5, []);
+    for (let i = 1; i < obPts.length - 1; i++) {
+      ctx.beginPath();
+      ctx.arc(obPts[i].x, obPts[i].y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,210,50,0.7)';
+      ctx.fill();
+    }
+
+    // ---- Stats更新 ----
+    if (obResult.pocketIndex !== null) {
+      STATE.lastEnteredPocket = obResult.pocketIndex;
+    } else {
+      STATE.lastEnteredPocket = null;
+    }
+
+    // ---- CBスタン後分離軌跡（物理ステップ演算）----
+    // deflectVec: 入射方向からcontactNorm成分を除いた接線方向
+    const deflectVec = normalize(
+      inVec.x - dotCB * contactNorm.x,
+      inVec.y - dotCB * contactNorm.y
+    );
+    const cbStart = clampToField(ghost);
+
+    if (!(deflectVec.x === 0 && deflectVec.y === 0)) {
+      const cbPts = simulateCBPhysics(cbStart, deflectVec, inVec, STATE.spin.y, STATE.spin.x, dotCB);
+      drawCBPath(cbPts);
+    }
+  }
+
+  // ---- 凡例 ----
+  const lx = TABLE.x + 6;
+  const ly = TABLE.y + 14;
+  ctx.font = `bold ${Math.max(9, TABLE.w * 0.025)}px sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(150,200,255,0.9)';
+  ctx.fillText('● 手玉', lx, ly);
+  ctx.fillStyle = 'rgba(255,210,50,0.9)';
+  ctx.fillText('● 的玉', lx, ly + Math.max(13, TABLE.w * 0.033));
+  ctx.fillStyle = 'rgba(180,130,255,0.9)';
+  ctx.fillText('● 手玉(跳ね)', lx, ly + Math.max(26, TABLE.w * 0.066));
+  ctx.fillStyle = 'rgba(100,220,255,0.9)';
+  ctx.fillText('✛ 照準(ドラッグ可)', lx, ly + Math.max(39, TABLE.w * 0.099));
+}
+
+/**
+ * 通常（無回転）のCB分離軌跡を描画する
+ */
+/**
+ * 手球の衝突後軌道をオイラー法（物理ステップ演算）で計算する。
+ *
+ * 原理:
+ *  - 衝突直後の速度は deflectVec（スタン分離方向）
+ *  - ラシャ摩擦により speed は減衰、方向は rollVec へ徐々に収束
+ *    rollVec = inVec * spinY（押し: 前方、引き: 後方、0: 横に止まる）
+ *  - クッション反射時は vx/vy を反転＋spinXによる反射角変化
+ *
+ * @param {object} startPt   - 開始座標 {x, y}
+ * @param {object} deflectVec - 正規化された分離方向ベクトル
+ * @param {object} inVec      - 正規化された入射方向ベクトル
+ * @param {number} spinY      - 縦スピン (-1=引き, 0=無回転, +1=押し)
+ * @param {number} spinX      - 横スピン (-1=左, 0=なし, +1=右)
+ * @returns {Array<{x,y}>}   - 軌跡点列
+ */
+function simulateCBPhysics(startPt, deflectVec, inVec, spinY, spinX, dotCB) {
+  const { x: fx, y: fy, w: fw, h: fh } = TABLE;
+  const bR = getBallRadius();
+  const left   = fx + bR, right  = fx + fw - bR;
+  const top    = fy + bR, bottom = fy + fh - bR;
+
+  // ---- パラメータ ----
+  const STEPS_PER_UNIT = 3.0;           // 滑らかな軌跡のためステップ数を増加
+  const MAX_DIST = (fw + fh) * 2.5;
+  const FRICTION = 0.045;
+  const SPEED_INIT = 1.0;
+  const SPEED_MIN = 0.02;
+  const MAX_BOUNCES = 4;
+  // spinXによる最大反射角変化（ラジアン）
+  const SPIN_MAX_ANGLE = 14 * Math.PI / 180; // ±14度
+
+  // rollVec: spinYに応じた目標ロール方向
+  // 厚み（dotCB）で強度を減衰させる：薄いカットほど押し引きが弱くなる
+  // dotCB=1(正面) → 係数1.0、dotCB=0(薄い) → 係数0
+  const thickness = Math.max(0, dotCB ?? 1); // dotCBが未指定なら1として扱う
+  const rollStrength = spinY * thickness;
+  const rollVec = {
+    x: inVec.x * rollStrength,
+    y: inVec.y * rollStrength,
+  };
+
+  let px = startPt.x, py = startPt.y;
+  let vx = deflectVec.x * SPEED_INIT;
+  let vy = deflectVec.y * SPEED_INIT;
+
+  const pts = [{ x: px, y: py }];
+  let bounces = 0;
+  let distTraveled = 0;
+  let prevX = px, prevY = py;
+
+  const STEP_SIZE = 1 / STEPS_PER_UNIT;
+
+  // spinXによる反射角変化を角度回転で適用するヘルパー
+  // 壁の種類に応じて「反射後の速度ベクトルを法線軸周りに回転」させる
+  function applySpinToReflection(hitWall) {
+    if (spinX === 0) return;
+    // 角度は入射角（壁法線と速度の角度）に比例させてクランプ
+    // 左右壁: 法線=x軸。接線成分=vy。入射角=atan2(|vx|, |vy|)
+    // 上下壁: 法線=y軸。接線成分=vx。入射角=atan2(|vy|, |vx|)
+    const isLR = hitWall === 'left' || hitWall === 'right';
+    // 入射角（法線からのずれ）0=正面 π/2=レール沿い
+    const incidentAngle = isLR
+      ? Math.atan2(Math.abs(vy), Math.abs(vx))
+      : Math.atan2(Math.abs(vx), Math.abs(vy));
+    // 浅い入射(incidentAngle→π/2)と急な入射(→0)の中間を適正範囲に
+    // 浅い入射では効果を弱める（クランプ）
+    const angleFactor = Math.sin(incidentAngle); // 0〜1
+    const deltaAngle = spinX * SPIN_MAX_ANGLE * angleFactor;
+    // 反射後のベクトルを deltaAngle だけ回転
+    const cosD = Math.cos(deltaAngle), sinD = Math.sin(deltaAngle);
+    const nvx = vx * cosD - vy * sinD;
+    const nvy = vx * sinD + vy * cosD;
+    // 正規化して長さ保持
+    const mag = Math.sqrt(nvx*nvx + nvy*nvy);
+    if (mag > 0) { vx = nvx / mag; vy = nvy / mag; }
+  }
+
+  while (distTraveled < MAX_DIST) {
+    const speed = Math.sqrt(vx * vx + vy * vy);
+    if (speed < SPEED_MIN) break;
+
+    // 摩擦によるrollVec収束
+    vx += (rollVec.x - vx) * FRICTION;
+    vy += (rollVec.y - vy) * FRICTION;
+
+    // 位置更新
+    px += vx * STEP_SIZE;
+    py += vy * STEP_SIZE;
+    distTraveled += STEP_SIZE;
+
+    // クッション反射（すり抜け防止付き）
+    let bounced = false;
+    let hitWall = null;
+    if (px >= right && vx > 0) {
+      px = right; vx = -vx; hitWall = 'right'; bounced = true;
+    } else if (px <= left && vx < 0) {
+      px = left; vx = -vx; hitWall = 'left'; bounced = true;
+    }
+    if (py >= bottom && vy > 0) {
+      py = bottom; vy = -vy; hitWall = 'bottom'; bounced = true;
+    } else if (py <= top && vy < 0) {
+      py = top; vy = -vy; hitWall = 'top'; bounced = true;
+    }
+
+    if (bounced) {
+      // spinXによる反射角変化（角度回転方式）
+      if (hitWall) applySpinToReflection(hitWall);
+
+      // rollVecも壁に合わせて反射
+      if (hitWall === 'left' || hitWall === 'right') rollVec.x = -rollVec.x;
+      if (hitWall === 'top'  || hitWall === 'bottom') rollVec.y = -rollVec.y;
+
+      pts.push({ x: px, y: py });
+      bounces++;
+      if (bounces >= MAX_BOUNCES) break;
+    }
+
+    // 間引き: 4px以上移動したときのみ点を追加
+    const dx = px - prevX, dy = py - prevY;
+    if (dx*dx + dy*dy >= 16) {
+      pts.push({ x: px, y: py });
+      prevX = px; prevY = py;
+    }
+  }
+
+  if (pts[pts.length - 1].x !== px || pts[pts.length - 1].y !== py) {
+    pts.push({ x: px, y: py });
+  }
+
+  return pts;
+}
+
+/**
+ * CB軌跡の描画（simulateCBPhysicsの結果を受け取って描画）
+ */
+function drawCBPath(cbPts) {
+  if (cbPts.length < 2) return;
+  const bR = getBallRadius();
+  drawTrajectoryPath(cbPts, 'rgba(180, 130, 255, 0.80)', 2, [5, 5]);
+  // バンク点マーク（隣接点と距離が大きい箇所 = 反射点）
+  for (let i = 1; i < cbPts.length - 1; i++) {
+    const d = Math.hypot(cbPts[i].x - cbPts[i-1].x, cbPts[i].y - cbPts[i-1].y);
+    if (d < 3) { // 反射点（急に近い点は間引き済み点ではなく反射点）
+      ctx.beginPath();
+      ctx.arc(cbPts[i].x, cbPts[i].y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(180,130,255,0.7)';
+      ctx.fill();
+    }
+  }
+  const cbEnd = cbPts[cbPts.length - 1];
+  drawCBGhost(cbEnd.x, cbEnd.y, bR);
+}
+
+function drawCBGhost(x, y, bR) {
+  ctx.beginPath();
+  ctx.arc(x, y, bR, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(180,130,255,0.13)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(180,130,255,0.75)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(x - bR * 0.28, y - bR * 0.28, bR * 0.28, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(210,180,255,0.35)';
+  ctx.fill();
+}
+
+/* Draw an arrowhead at the end of a line */
+function drawArrow(x1, y1, x2, y2, color, size) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle - Math.PI/7), y2 - size * Math.sin(angle - Math.PI/7));
+  ctx.lineTo(x2 - size * Math.cos(angle + Math.PI/7), y2 - size * Math.sin(angle + Math.PI/7));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function toggleSimulation() {
+  STATE.simulating = !STATE.simulating;
+  if (!STATE.simulating) STATE.aimAngle = null; // シミュ終了時に照準リセット
+  const btn = document.getElementById('btn-sim');
+  btn.classList.toggle('btn-sim-on', STATE.simulating);
+  btn.textContent = STATE.simulating ? '🎯 シミュ中' : '🎯 シミュ';
+  draw();
+}
+
+function getBallRadius() {
+  // Real billiard ball: ø57.2mm on a 9ft table (playing surface ≈ 2540mm wide)
+  // Ratio: radius = width * (28.6 / 2540) ≈ width * 0.01126
+  // We use the same ratio here. min 6px so it stays tappable.
+  return Math.max(6, TABLE.w * 0.01126);
+}
+
+function drawBall(cx, cy, r, color, strokeColor) {
+  // Shadow
+  ctx.beginPath();
+  ctx.arc(cx + 2, cy + 2, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+
+  // Main ball
+  const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+  grad.addColorStop(0, lightenColor(color, 60));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darkenColor(color, 40));
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  if (strokeColor) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Highlight
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.28, cy - r * 0.28, r * 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fill();
+}
+
+function drawDiamonds() {
+  const { x, y, w, h, cushion } = TABLE;
+
+  // --- Diamond (point mark) sizing ---
+  const dSize = Math.max(3, cushion * 0.22); // scale with cushion width
+
+  // ポイントマークの仕様（実際のビリヤード台に準拠）:
+  //  ロングレール（長辺）: コーナーポケット間を8等分 → 内点7個
+  //  ショートレール（短辺）: コーナーポケット間を4等分 → 内点3個
+  //
+  //  ロングレール上の位置: i/8 * w  (i = 1..7)
+  //  ショートレール上の位置: i/4 * h  (i = 1..3)
+
+  const railOffset = cushion * 0.5; // how far into the cushion to place marks
+
+  // Helper: draw one diamond with a slight inset shine
+  function drawMark(cx, cy) {
+    // Outer shape (dark gold / ivory)
+    ctx.fillStyle = 'rgba(255, 235, 160, 0.85)';
+    diamond(ctx, cx, cy, dSize);
+    // Inner highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    diamond(ctx, cx, cy, dSize * 0.42);
+  }
+
+  // --- Long rails (Top & Bottom): 7 points each ---
+  for (let i = 1; i <= 7; i++) {
+    const dx = x + (w / 8) * i;
+    drawMark(dx, y - railOffset);       // top rail
+    drawMark(dx, y + h + railOffset);   // bottom rail
+  }
+
+  // --- Short rails (Left & Right): 3 points each ---
+  for (let i = 1; i <= 3; i++) {
+    const dy = y + (h / 4) * i;
+    drawMark(x - railOffset, dy);       // left rail
+    drawMark(x + w + railOffset, dy);   // right rail
+  }
+}
+
+function diamond(ctx, cx, cy, s) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - s);
+  ctx.lineTo(cx + s, cy);
+  ctx.lineTo(cx, cy + s);
+  ctx.lineTo(cx - s, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ============================================================
+   COLOR HELPERS
+============================================================ */
+function lightenColor(hex, amount) {
+  return adjustColor(hex, amount);
+}
+function darkenColor(hex, amount) {
+  return adjustColor(hex, -amount);
+}
+function adjustColor(hex, amount) {
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  r = Math.min(255, Math.max(0, r + amount));
+  g = Math.min(255, Math.max(0, g + amount));
+  b = Math.min(255, Math.max(0, b + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ============================================================
+   MATH / CALCULATIONS
+============================================================ */
+
+/**
+ * Euclidean distance between two points.
+ * Returns distance in canvas pixels (raw).
+ */
+function dist(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Convert canvas pixels to "table units" where the full table width = 100%.
+ * This gives a consistent unit regardless of screen size.
+ */
+function toTableUnits(px) {
+  return (px / TABLE.w * 100);
+}
+
+/**
+ * Calculate CUT ANGLE.
+ *
+ * The cut angle is the angle between:
+ *   - Line A: cue ball → object ball (approach direction)
+ *   - Line B: object ball → pocket (target direction)
+ *
+ * A cut angle of 0° means the cue ball is in a straight line behind
+ * the object ball toward the pocket (no cut needed).
+ * A cut angle of 90° means the cue ball is perpendicular to the OB→pocket line.
+ *
+ * Steps:
+ * 1. Vector from OB to pocket: vecP
+ * 2. Vector from CB to OB:     vecC
+ * 3. Use dot product formula: cos(θ) = (vecC · vecP) / (|vecC| * |vecP|)
+ * 4. θ = acos(cos(θ)) — this is the angle between the two vectors
+ * 5. Subtract from 90° to get the conventional "cut" angle,
+ *    or simply use 180° - θ to get the angle between the two lines.
+ *
+ * We use the angle between the CB→OB direction and OB→pocket direction directly.
+ */
+function calculateCutAngle(cb, ob, pocket) {
+  // Vector: OB → Pocket
+  const px = pocket.x - ob.x;
+  const py = pocket.y - ob.y;
+
+  // Vector: CB → OB
+  const cx = ob.x - cb.x;
+  const cy = ob.y - cb.y;
+
+  const magP = Math.sqrt(px * px + py * py);
+  const magC = Math.sqrt(cx * cx + cy * cy);
+
+  if (magP === 0 || magC === 0) return 0;
+
+  // Dot product
+  const dot = cx * px + cy * py;
+  // Clamp to [-1, 1] to avoid floating point issues with acos
+  const cosTheta = Math.max(-1, Math.min(1, dot / (magP * magC)));
+  // Angle between the two vectors in degrees
+  const angleDeg = Math.acos(cosTheta) * (180 / Math.PI);
+
+  // "Cut angle" = angle between approach line (CB→OB extended) and OB→Pocket
+  // When angleDeg = 0: straight shot (no cut)
+  // When angleDeg = 90: maximum cut
+  // We return this directly as the cut angle.
+  return angleDeg;
+}
+
+/**
+ * Determine LEFT or RIGHT cut (振り).
+ *
+ * Standing at the cue ball looking toward the object ball, is the pocket
+ * to the left or right?
+ *
+ * We use the cross product (2D) of the CB→OB vector and OB→Pocket vector.
+ * Cross product z-component: cx*py - cy*px
+ *   > 0 → pocket is to the LEFT  (左振り)
+ *   < 0 → pocket is to the RIGHT (右振り)
+ *   = 0 → straight shot
+ */
+function calculateSide(cb, ob, pocket) {
+  const cx = ob.x - cb.x;
+  const cy = ob.y - cb.y;
+  const px = pocket.x - ob.x;
+  const py = pocket.y - ob.y;
+
+  const cross = cx * py - cy * px;
+
+  if (Math.abs(cross) < 0.01) return 'ストレート';
+  // Note: canvas Y-axis is inverted (down = positive), so flip sign
+  return cross > 0 ? '右振り' : '左振り';
+}
+
+/* ============================================================
+   STATS UPDATE
+============================================================ */
+function updateStats() {
+  const cb = STATE.cueBall;
+  const ob = STATE.objectBall;
+
+  if (!cb || !ob) {
+    setStatText('stat-dist-cb', '—');
+    setStatText('stat-dist-pocket', '—');
+    setStatText('stat-cut-angle', '—');
+    setStatText('stat-side', '—');
+    return;
+  }
+
+  setStatText('stat-dist-cb', toTableUnits(dist(cb, ob)).toFixed(1) + '%');
+
+  const pi = STATE.lastEnteredPocket;
+  if (pi !== null) {
+    const pocket = { x: TABLE.pockets[pi][0], y: TABLE.pockets[pi][1] };
+    setStatText('stat-dist-pocket', toTableUnits(dist(ob, pocket)).toFixed(1) + '%');
+    setStatText('stat-cut-angle', calculateCutAngle(cb, ob, pocket).toFixed(1) + '°');
+    setStatText('stat-side', calculateSide(cb, ob, pocket));
+  } else {
+    setStatText('stat-dist-pocket', '—');
+    setStatText('stat-cut-angle', '—');
+    setStatText('stat-side', '—');
+  }
+}
+
+function setStatText(id, val) {
+  document.getElementById(id).textContent = val;
+}
+
+/* ============================================================
+   BALL TYPE & POCKET SELECTION
+============================================================ */
+function selectBallType(type) {
+  STATE.selectedBallType = type;
+  document.getElementById('opt-cue').classList.toggle('selected', type === 'cue');
+  document.getElementById('opt-red').classList.toggle('selected', type === 'red');
+}
+
+function buildPocketButtons() {
+  // ポケット選択UIは廃止
+}
+
+/* ============================================================
+   CANVAS EVENTS — Mouse & Touch
+============================================================ */
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  let cx, cy;
+  if (e.touches) {
+    cx = (e.touches[0].clientX - rect.left) * scaleX;
+    cy = (e.touches[0].clientY - rect.top) * scaleY;
+  } else {
+    cx = (e.clientX - rect.left) * scaleX;
+    cy = (e.clientY - rect.top) * scaleY;
+  }
+  return { x: cx, y: cy };
+}
+
+function clampToField(pos) {
+  const bR = getBallRadius();
+  return {
+    x: Math.max(TABLE.x + bR, Math.min(TABLE.x + TABLE.w - bR, pos.x)),
+    y: Math.max(TABLE.y + bR, Math.min(TABLE.y + TABLE.h - bR, pos.y)),
+  };
+}
+
+function hitTest(pos) {
+  const r = getBallRadius() * 2.5; // スマホタッチでも確実に当たるよう広め
+  if (STATE.cueBall && dist(pos, STATE.cueBall) < r) return 'cue';
+  if (STATE.objectBall && dist(pos, STATE.objectBall) < r) return 'object';
+  return null;
+}
+
+let _aimDragStart = null;
+let _aimAngleAtDragStart = null;
+
+function onPointerDown(e) {
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+
+  if (STATE.simulating && STATE.cueBall && STATE.objectBall) {
+    const hit = hitTest(pos);
+    if (hit === 'cue' || hit === 'object') {
+      // シミュ中でも球のドラッグを優先
+      STATE.dragging = hit;
+    } else {
+      // 球以外の場所 → 照準ドラッグ
+      STATE.dragging = 'aim';
+      _aimDragStart = pos;
+      _aimAngleAtDragStart = STATE.aimAngle !== null
+        ? STATE.aimAngle
+        : Math.atan2(STATE.objectBall.y - STATE.cueBall.y, STATE.objectBall.x - STATE.cueBall.x);
+    }
+    return;
+  }
+
+  // 非シミュ中：球の配置・ドラッグ
+  const hit = hitTest(pos);
+  if (hit) {
+    STATE.dragging = hit;
+  } else {
+    const p = clampToField(pos);
+    const bR = getBallRadius();
+    if (STATE.selectedBallType === 'cue') {
+      if (STATE.objectBall && dist(p, STATE.objectBall) < bR * 2) return;
+      STATE.cueBall = p;
+    } else {
+      if (STATE.cueBall && dist(p, STATE.cueBall) < bR * 2) return;
+      STATE.objectBall = p;
+    }
+    draw();
+  }
+}
+
+function onPointerMove(e) {
+  if (!STATE.dragging) return;
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+
+  if (STATE.dragging === 'aim') {
+    // ドラッグ量を角度差に変換してaimAngleを更新
+    const cb = STATE.cueBall;
+    // ポインタ位置そのものをCBからの方向として使う（直感的）
+    STATE.aimAngle = Math.atan2(pos.y - cb.y, pos.x - cb.x);
+    draw();
+    return;
+  }
+
+  const clamped = clampToField(pos);
+  const bR = getBallRadius();
+  if (STATE.dragging === 'cue') {
+    if (!STATE.objectBall || dist(clamped, STATE.objectBall) >= bR * 2) {
+      STATE.cueBall = clamped;
+      if (STATE.simulating) STATE.aimAngle = null; // 球移動したら照準リセット
+    }
+  } else {
+    if (!STATE.cueBall || dist(clamped, STATE.cueBall) >= bR * 2) {
+      STATE.objectBall = clamped;
+      if (STATE.simulating) STATE.aimAngle = null;
+    }
+  }
+  draw();
+}
+
+function onPointerUp(e) {
+  STATE.dragging = null;
+  _aimDragStart = null;
+  _aimAngleAtDragStart = null;
+}
+
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+canvas.addEventListener('mouseup', onPointerUp);
+
+canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+canvas.addEventListener('touchend', onPointerUp);
+
+/* ============================================================
+   RESET
+============================================================ */
+function resetTable() {
+  STATE.cueBall = null;
+  STATE.objectBall = null;
+  STATE.aimAngle = null;
+  draw();
+}
+
+/* ============================================================
+   SAVE MODAL
+============================================================ */
+function openSaveModal(defaultResult) {
+  if (!STATE.cueBall && !STATE.objectBall) {
+    showToast('まず球を配置してください');
+    return;
+  }
+  setModalResult(defaultResult);
+  document.getElementById('modal-memo').value = '';
+  document.getElementById('save-modal').classList.add('open');
+}
+
+function closeSaveModal() {
+  document.getElementById('save-modal').classList.remove('open');
+}
+
+function setModalResult(result) {
+  STATE.modalResult = result;
+  document.getElementById('modal-miss-btn').classList.toggle('selected', result === 'miss');
+  document.getElementById('modal-success-btn').classList.toggle('selected', result === 'success');
+}
+
+function saveRecord() {
+  const cb = STATE.cueBall;
+  const ob = STATE.objectBall;
+  const pi = STATE.lastEnteredPocket;
+
+  let distCB = null, distOBP = null, cutAngle = null, side = null;
+  if (cb && ob) {
+    distCB = toTableUnits(dist(cb, ob));
+    if (pi !== null) {
+      const pocket = { x: TABLE.pockets[pi][0], y: TABLE.pockets[pi][1] };
+      distOBP  = toTableUnits(dist(ob, pocket));
+      cutAngle = calculateCutAngle(cb, ob, pocket);
+      side     = calculateSide(cb, ob, pocket);
+    }
+  }
+
+  const record = {
+    id: Date.now(),
+    ts: new Date().toISOString(),
+    result: STATE.modalResult,
+    memo: document.getElementById('modal-memo').value.trim(),
+    cueBall:    cb ? { rx: (cb.x - TABLE.x) / TABLE.w, ry: (cb.y - TABLE.y) / TABLE.h } : null,
+    objectBall: ob ? { rx: (ob.x - TABLE.x) / TABLE.w, ry: (ob.y - TABLE.y) / TABLE.h } : null,
+    pocket: pi,
+    spin: { x: STATE.spin.x, y: STATE.spin.y },
+    stats: { distCB, distOBP, cutAngle, side },
+  };
+
+  const records = loadRecords();
+  records.unshift(record);
+  localStorage.setItem('billiards_records', JSON.stringify(records));
+
+  closeSaveModal();
+  showToast('記録しました ✓');
+}
+
+/* ============================================================
+   HISTORY
+============================================================ */
+function loadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem('billiards_records') || '[]');
+  } catch { return []; }
+}
+
+function renderHistory() {
+  const records = loadRecords();
+  const container = document.getElementById('history-content');
+
+  if (records.length === 0) {
+    container.innerHTML = `
+      <div class="history-empty">
+        <div class="icon">📋</div>
+        <div>記録がまだありません。<br>台画面またはボーラードで保存してください。</div>
+      </div>`;
+    return;
+  }
+
+  let html = '<div class="history-list">';
+  records.forEach(r => {
+    const dt = new Date(r.ts);
+    const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+
+    if (r.type === 'bowlliard') {
+      // ボーラードカード
+      const perfect = r.totalScore === 300 ? ' 🏆' : r.totalScore >= 200 ? ' 🌟' : '';
+      html += `
+        <div class="history-card-bowl">
+          <div>
+            <div class="bowl-card-label">🎳 ボーラード</div>
+            <div class="bowl-card-score">${r.totalScore}${perfect}</div>
+          </div>
+          <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+            <div class="bowl-card-date">${dateStr}</div>
+            <button class="btn-sm btn-sm-del" onclick="deleteRecord(${r.id})">削除</button>
+          </div>
+        </div>`;
+    } else {
+      // 配置記録カード（既存）
+      const s = r.stats || {};
+      html += `
+        <div class="history-card">
+          <div style="grid-column:1">
+            <div class="hc-header">
+              <span class="result-badge ${r.result === 'miss' ? 'badge-miss' : 'badge-success'}">${r.result === 'miss' ? 'ミス' : '成功'}</span>
+              ${r.pocket != null ? `<span style="font-size:0.75rem;color:var(--text-muted)">→ ${POCKET_NAMES[r.pocket]}</span>` : ''}
+              <span class="hc-date">${dateStr}</span>
+            </div>
+            <div class="hc-stats">
+              ${s.distCB != null ? `<div class="hc-stat">${s.distCB.toFixed(1)}% <span>CB距離</span></div>` : ''}
+              ${s.distOBP != null ? `<div class="hc-stat">${s.distOBP.toFixed(1)}% <span>OB距離</span></div>` : ''}
+              ${s.cutAngle != null ? `<div class="hc-stat">${s.cutAngle.toFixed(1)}° <span>カット角</span></div>` : ''}
+              ${s.side ? `<div class="hc-stat">${s.side}</div>` : ''}
+              ${r.spin ? `<div class="hc-stat">縦${r.spin.y >= 0 ? '+' : ''}${r.spin.y.toFixed(1)} 横${r.spin.x >= 0 ? '+' : ''}${r.spin.x.toFixed(1)} <span>撞点</span></div>` : ''}
+            </div>
+            ${r.memo ? `<div class="hc-memo">${escHtml(r.memo)}</div>` : ''}
+          </div>
+          <div class="hc-actions">
+            <button class="btn-sm btn-sm-load" onclick="loadRecord(${r.id})">復元</button>
+            <button class="btn-sm btn-sm-del" onclick="deleteRecord(${r.id})">削除</button>
+          </div>
+        </div>`;
+    }
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function loadRecord(id) {
+  const records = loadRecords();
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+
+  STATE.cueBall = r.cueBall
+    ? { x: TABLE.x + r.cueBall.rx * TABLE.w, y: TABLE.y + r.cueBall.ry * TABLE.h }
+    : null;
+  STATE.objectBall = r.objectBall
+    ? { x: TABLE.x + r.objectBall.rx * TABLE.w, y: TABLE.y + r.objectBall.ry * TABLE.h }
+    : null;
+
+  draw();
+  switchView('table');
+  showToast('配置を復元しました');
+}
+
+function deleteRecord(id) {
+  const records = loadRecords().filter(x => x.id !== id);
+  localStorage.setItem('billiards_records', JSON.stringify(records));
+  renderHistory();
+}
+
+function clearAllHistory() {
+  if (!confirm('全ての記録を削除しますか？')) return;
+  localStorage.removeItem('billiards_records');
+  renderHistory();
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ============================================================
+   AI TEXT COPY
+============================================================ */
+function copyAIText() {
+  const cb = STATE.cueBall;
+  const ob = STATE.objectBall;
+
+  if (!cb || !ob) {
+    showToast('手球と的球を配置してください');
+    return;
+  }
+
+  const pi = STATE.lastEnteredPocket;
+  const distCB = toTableUnits(dist(cb, ob)).toFixed(1);
+  const lines = [
+    'ビリヤードの練習中です。以下の配置について、的球をポケットに入れる際のアドバイスをお願いします。',
+    '',
+    '■ 配置情報',
+    `・手球と的球の距離: 台の幅を100%としたとき ${distCB}%`,
+  ];
+
+  if (pi !== null) {
+    const pocket = { x: TABLE.pockets[pi][0], y: TABLE.pockets[pi][1] };
+    lines.push(`・狙うポケット: ${POCKET_NAMES[pi]}`);
+    lines.push(`・的球とポケットの距離: ${toTableUnits(dist(ob, pocket)).toFixed(1)}%`);
+    lines.push(`・カット角: ${calculateCutAngle(cb, ob, pocket).toFixed(1)}度`);
+    lines.push(`・振り: ${calculateSide(cb, ob, pocket)}`);
+  }
+
+  const sy = STATE.spin.y, sx = STATE.spin.x;
+  const spinVertLabel = sy > 0.05 ? `押し(+${sy.toFixed(1)})` : sy < -0.05 ? `引き(${sy.toFixed(1)})` : '中心';
+  const spinHorizLabel = sx > 0.05 ? `右ひねり(+${sx.toFixed(1)})` : sx < -0.05 ? `左ひねり(${sx.toFixed(1)})` : '中心';
+  lines.push(`・撞点: 縦=${spinVertLabel} / 横=${spinHorizLabel}`);
+
+  lines.push('');
+  lines.push('この配置で注意すべき点、推奨される撞点、力加減についてアドバイスをください。');
+
+  const text = lines.join('\n');
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('クリップボードにコピーしました 📋');
+    }).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  showToast('コピーしました 📋');
+}
+
+/* ============================================================
+   BOWLLIARD
+   フラット配列（rolls）でスコア管理する厳密なボウリング計算
+============================================================ */
+
+// rolls[0..20]: 各投の倒したピン数（0〜10）
+// activeCell: { frame: 0-9, roll: 0-2 }
+const BOWL = {
+  rolls: Array(21).fill(null), // null = 未入力
+  activeFrame: null,
+  activeRoll: null,
+};
+
+/* ---- スコア計算 ---- */
+function calcBowlScore() {
+  const r = BOWL.rolls;
+  const frameScores = []; // 各フレームまでの累計
+  let ri = 0; // rollsのインデックス
+  let total = 0;
+
+  for (let f = 0; f < 10; f++) {
+    if (r[ri] === null) { frameScores.push(null); ri++; continue; }
+
+    if (f < 9) {
+      if (r[ri] === 10) {
+        // ストライク
+        const b1 = r[ri+1] ?? null, b2 = r[ri+2] ?? null;
+        if (b1 === null || b2 === null) { frameScores.push(null); ri++; continue; }
+        total += 10 + b1 + b2;
+        frameScores.push(total);
+        ri += 1;
+      } else {
+        const p2 = r[ri+1] ?? null;
+        if (p2 === null) { frameScores.push(null); ri += 2; continue; }
+        if (r[ri] + p2 === 10) {
+          // スペア
+          const b1 = r[ri+2] ?? null;
+          if (b1 === null) { frameScores.push(null); ri += 2; continue; }
+          total += 10 + b1;
+        } else {
+          total += r[ri] + p2;
+        }
+        frameScores.push(total);
+        ri += 2;
+      }
+    } else {
+      // 10フレーム: 最大3投、ボーナスなしでそのまま加算
+      const p1 = r[ri] ?? 0;
+      const p2 = r[ri+1] ?? null;
+      const p3 = r[ri+2] ?? null;
+      let fScore = p1;
+      if (p2 !== null) fScore += p2;
+      if (p3 !== null) fScore += p3;
+      // 少なくとも2投入力済みなら表示
+      if (p2 !== null) {
+        total += fScore;
+        frameScores.push(total);
+      } else {
+        frameScores.push(null);
+      }
+    }
+  }
+  return frameScores;
+}
+
+/* ---- rolls上のインデックス計算 ---- */
+// フレームf・投目r（0-indexed）→ rollsのインデックス
+function rollIndex(frame, roll) {
+  let ri = 0;
+  for (let f = 0; f < frame; f++) {
+    if (f < 9) {
+      ri += (BOWL.rolls[ri] === 10) ? 1 : 2;
+    } else {
+      ri += 3;
+    }
+  }
+  return ri + roll;
+}
+
+/* ---- 入力可能な最大値を返す ---- */
+function maxPinsForRoll(frame, roll) {
+  if (frame < 9) {
+    if (roll === 0) return 10;
+    const ri0 = rollIndex(frame, 0);
+    return 10 - (BOWL.rolls[ri0] ?? 0);
+  } else {
+    // 10フレーム
+    const ri0 = rollIndex(10, 0); // = rollIndex(9,0)
+    const r0 = BOWL.rolls[ri0] ?? 0;
+    const r1 = BOWL.rolls[ri0+1] ?? null;
+    if (roll === 0) return 10;
+    if (roll === 1) return r0 === 10 ? 10 : 10 - r0;
+    if (roll === 2) {
+      if (r0 === 10 && r1 === 10) return 10;
+      if (r0 === 10) return 10 - (r1 ?? 0);
+      if (r0 + (r1??0) === 10) return 10;
+      return 0; // 3投目なし
+    }
+  }
+  return 10;
+}
+
+/* ---- 3投目が入力可能か ---- */
+function canRoll3(frame) {
+  if (frame !== 9) return false;
+  const ri = rollIndex(9, 0);
+  const r0 = BOWL.rolls[ri], r1 = BOWL.rolls[ri+1];
+  if (r0 === null || r1 === null) return false;
+  return r0 === 10 || r0 + r1 === 10;
+}
+
+/* ---- スコアシートのHTMLを生成・描画 ---- */
+function renderScoreSheet() {
+  const container = document.getElementById('score-frames');
+  const frameScores = calcBowlScore();
+  let html = '';
+
+  for (let f = 0; f < 10; f++) {
+    const is10 = f === 9;
+    const ri0 = rollIndex(f, 0);
+    const r0 = BOWL.rolls[ri0];
+    const r1 = BOWL.rolls[ri0+1];
+    const r2 = is10 ? BOWL.rolls[ri0+2] : null;
+
+    const fScore = frameScores[f];
+    const scoreText = fScore !== null ? String(fScore) : '';
+
+    // 各セルの表示テキストとクラスを決定
+    function cellDisplay(rVal, rIdx, rollNum) {
+      if (rVal === null) return { text: '', cls: '' };
+      if (!is10) {
+        if (rollNum === 0 && rVal === 10) return { text: 'X', cls: 'strike' };
+        if (rollNum === 1 && (BOWL.rolls[ri0] + rVal) === 10) return { text: '/', cls: 'spare' };
+        return { text: rVal === 0 ? '-' : String(rVal), cls: '' };
+      } else {
+        // 10フレーム
+        if (rollNum === 0 && rVal === 10) return { text: 'X', cls: 'strike' };
+        if (rollNum === 1) {
+          if (r0 === 10 && rVal === 10) return { text: 'X', cls: 'strike' };
+          if (r0 !== 10 && (r0 + rVal) === 10) return { text: '/', cls: 'spare' };
+        }
+        if (rollNum === 2) {
+          if (rVal === 10) return { text: 'X', cls: 'strike' };
+          if (r0 === 10 && r1 !== 10 && (r1 + rVal) === 10) return { text: '/', cls: 'spare' };
+        }
+        return { text: rVal === 0 ? '-' : String(rVal), cls: '' };
+      }
+    }
+
+    const d0 = cellDisplay(r0, ri0, 0);
+    const d1 = cellDisplay(r1, ri0+1, 1);
+    const d2 = is10 ? cellDisplay(r2, ri0+2, 2) : null;
+
+    function cellClass(rVal, rollNum, d) {
+      let cls = `roll-cell ${d.cls}`;
+      if (BOWL.activeFrame === f && BOWL.activeRoll === rollNum) cls += ' active-input';
+      // disabled判定
+      const isDisabled =
+        (rollNum === 1 && !is10 && r0 === 10) ||
+        (rollNum === 2 && is10 && !canRoll3(f));
+      if (isDisabled) cls += ' disabled';
+      return cls;
+    }
+
+    html += `<div class="score-frame ${is10 ? 'frame-10' : ''}">
+      <div class="frame-label">${f+1}F</div>
+      <div class="frame-rolls">
+        <div class="${cellClass(r0, 0, d0)}" onclick="selectRollCell(${f},0)">${d0.text}</div>`;
+
+    if (!is10 && r0 !== 10) {
+      html += `<div class="${cellClass(r1, 1, d1)}" onclick="selectRollCell(${f},1)">${d1.text}</div>`;
+    } else if (!is10) {
+      html += `<div class="roll-cell disabled"></div>`;
+    } else {
+      // 10フレーム
+      html += `<div class="${cellClass(r1, 1, d1)}" onclick="selectRollCell(${f},1)">${d1.text}</div>`;
+      const d2cls = canRoll3(f)
+        ? cellClass(r2, 2, d2)
+        : 'roll-cell disabled';
+      html += `<div class="${d2cls}" onclick="selectRollCell(${f},2)">${d2 ? d2.text : ''}</div>`;
+    }
+
+    html += `</div>
+      <div class="frame-score">${scoreText}</div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+  document.getElementById('bowl-total').textContent = String(frameScores.filter(s => s !== null).slice(-1)[0] ?? 0);
+}
+
+/* ---- セル選択 ---- */
+function selectRollCell(frame, roll) {
+  // 未入力の前の投があれば最初の未入力を選ぶ
+  BOWL.activeFrame = frame;
+  BOWL.activeRoll = roll;
+  openNumpad(frame, roll);
+  renderScoreSheet();
+}
+
+/* ---- テンキーを開く ---- */
+function openNumpad(frame, roll) {
+  const maxPins = maxPinsForRoll(frame, roll);
+  const overlay = document.getElementById('numpad-overlay');
+  const hint = document.getElementById('numpad-hint');
+  const grid = document.getElementById('numpad-grid');
+
+  hint.textContent = `${frame+1}フレーム ${roll+1}投目（最大 ${maxPins}）`;
+
+  // ボタン生成: 0〜maxPins + 削除 + 閉じる
+  let btns = '';
+  for (let i = 0; i <= maxPins; i++) {
+    btns += `<button class="numpad-btn" onclick="inputPin(${i})">${i === 0 ? '-' : i}</button>`;
+  }
+  // 空きを埋める（6列グリッドのため最大11個 → 残りをspan）
+  btns += `<button class="numpad-btn numpad-del" onclick="deletePin()">⌫</button>`;
+  btns += `<button class="numpad-btn numpad-close" onclick="closeNumpad()">完了</button>`;
+  grid.innerHTML = btns;
+
+  overlay.classList.add('open');
+}
+
+function closeNumpad() {
+  document.getElementById('numpad-overlay').classList.remove('open');
+  BOWL.activeFrame = null;
+  BOWL.activeRoll = null;
+  renderScoreSheet();
+}
+
+/* ---- ピン数入力 ---- */
+function inputPin(pins) {
+  if (BOWL.activeFrame === null) return;
+  const ri = rollIndex(BOWL.activeFrame, BOWL.activeRoll);
+  BOWL.rolls[ri] = pins;
+
+  // 次のセルへ自動移動
+  advanceActiveCell();
+  renderScoreSheet();
+  // テンキーのヒントを更新
+  if (BOWL.activeFrame !== null) {
+    openNumpad(BOWL.activeFrame, BOWL.activeRoll);
+  } else {
+    closeNumpad();
+  }
+}
+
+function deletePin() {
+  if (BOWL.activeFrame === null) return;
+  const ri = rollIndex(BOWL.activeFrame, BOWL.activeRoll);
+  BOWL.rolls[ri] = null;
+  // 後続を全消し
+  for (let i = ri; i < 21; i++) BOWL.rolls[i] = null;
+  renderScoreSheet();
+  openNumpad(BOWL.activeFrame, BOWL.activeRoll);
+}
+
+/* ---- 次の入力セルへ移動 ---- */
+function advanceActiveCell() {
+  let f = BOWL.activeFrame, r = BOWL.activeRoll;
+  if (f === null) return;
+
+  if (f < 9) {
+    const ri0 = rollIndex(f, 0);
+    if (r === 0 && BOWL.rolls[ri0] !== 10) {
+      // 2投目へ
+      BOWL.activeRoll = 1;
+    } else {
+      // 次フレームへ
+      BOWL.activeFrame = f + 1;
+      BOWL.activeRoll = 0;
+    }
+  } else {
+    // 10フレーム
+    if (r === 0) {
+      BOWL.activeRoll = 1;
+    } else if (r === 1) {
+      if (canRoll3(f)) BOWL.activeRoll = 2;
+      else { BOWL.activeFrame = null; BOWL.activeRoll = null; }
+    } else {
+      BOWL.activeFrame = null; BOWL.activeRoll = null;
+    }
+  }
+}
+
+/* ---- リセット ---- */
+function resetBowlliard() {
+  BOWL.rolls = Array(21).fill(null);
+  BOWL.activeFrame = null;
+  BOWL.activeRoll = null;
+  closeNumpad();
+  renderScoreSheet();
+}
+
+/* ---- 保存 ---- */
+function saveBowlliard() {
+  const frameScores = calcBowlScore();
+  const totalScore = frameScores.filter(s => s !== null).slice(-1)[0] ?? 0;
+  const hasData = BOWL.rolls.some(r => r !== null);
+  if (!hasData) { showToast('スコアを入力してください'); return; }
+
+  const record = {
+    id: Date.now(),
+    ts: new Date().toISOString(),
+    type: 'bowlliard',
+    totalScore,
+    frameScores,
+    rolls: [...BOWL.rolls],
+  };
+
+  const records = loadRecords();
+  records.unshift(record);
+  localStorage.setItem('billiards_records', JSON.stringify(records));
+  showToast('ボーラードスコアを保存しました ✓');
+}
+
+/* ============================================================
+   VIEW SWITCHING
+============================================================ */
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.getElementById('tab-' + view).classList.add('active');
+
+  if (view === 'history') renderHistory();
+  if (view === 'bowlliard') renderScoreSheet();
+  if (view === 'table') {
+    requestAnimationFrame(() => { resizeCanvas(); });
+  }
+}
+
+/* ============================================================
+   TOAST
+============================================================ */
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   SPIN SELECTOR
+============================================================ */
+const spinCanvas = document.getElementById('spin-canvas');
+const spinCtx = spinCanvas.getContext('2d');
+const SPIN_SIZE = 72; // canvas size in px
+spinCanvas.width = SPIN_SIZE;
+spinCanvas.height = SPIN_SIZE;
+
+function drawSpinSelector() {
+  const c = spinCtx;
+  const W = SPIN_SIZE, H = SPIN_SIZE;
+  const cx = W / 2, cy = H / 2;
+  const R = W / 2 - 3; // outer radius
+  c.clearRect(0, 0, W, H);
+
+  // 背景: 手球グラデーション
+  const grad = c.createRadialGradient(cx - R*0.3, cy - R*0.3, R*0.1, cx, cy, R);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.5, '#e8e8e0');
+  grad.addColorStop(1, '#b0b0a0');
+  c.beginPath();
+  c.arc(cx, cy, R, 0, Math.PI * 2);
+  c.fillStyle = grad;
+  c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.3)';
+  c.lineWidth = 1.5;
+  c.stroke();
+
+  // ガイド線（縦横）
+  c.strokeStyle = 'rgba(100,180,120,0.4)';
+  c.lineWidth = 1;
+  c.setLineDash([2, 2]);
+  c.beginPath();
+  c.moveTo(cx, cy - R); c.lineTo(cx, cy + R);
+  c.moveTo(cx - R, cy); c.lineTo(cx + R, cy);
+  c.stroke();
+  c.setLineDash([]);
+
+  // 有効範囲円
+  c.beginPath();
+  c.arc(cx, cy, R * 0.78, 0, Math.PI * 2);
+  c.strokeStyle = 'rgba(100,180,120,0.25)';
+  c.lineWidth = 1;
+  c.stroke();
+
+  // 撞点マーカー
+  const MAX_OFFSET = R * 0.78;
+  const mx = cx + STATE.spin.x * MAX_OFFSET;
+  const my = cy - STATE.spin.y * MAX_OFFSET; // y軸反転
+
+  // 外リング
+  c.beginPath();
+  c.arc(mx, my, 7, 0, Math.PI * 2);
+  c.fillStyle = 'rgba(100,220,255,0.25)';
+  c.fill();
+  c.strokeStyle = 'rgba(100,220,255,0.95)';
+  c.lineWidth = 2;
+  c.stroke();
+  // 中心点
+  c.beginPath();
+  c.arc(mx, my, 2.5, 0, Math.PI * 2);
+  c.fillStyle = 'rgba(100,220,255,1.0)';
+  c.fill();
+
+  // テキスト更新
+  const sx = STATE.spin.x, sy = STATE.spin.y;
+  let label = '中心';
+  if (Math.abs(sx) > 0.1 || Math.abs(sy) > 0.1) {
+    const v = sy > 0.1 ? '押し' : sy < -0.1 ? '引き' : '';
+    const h = sx > 0.1 ? '右' : sx < -0.1 ? '左' : '';
+    label = (v && h) ? `${v}・${h}` : (v || h || '中心');
+  }
+  document.getElementById('spin-value-text').textContent = label;
+}
+
+function getSpinFromPos(e) {
+  const rect = spinCanvas.getBoundingClientRect();
+  const scaleX = SPIN_SIZE / rect.width;
+  const scaleY = SPIN_SIZE / rect.height;
+  let px, py;
+  if (e.touches) {
+    px = (e.touches[0].clientX - rect.left) * scaleX;
+    py = (e.touches[0].clientY - rect.top) * scaleY;
+  } else {
+    px = (e.clientX - rect.left) * scaleX;
+    py = (e.clientY - rect.top) * scaleY;
+  }
+  const cx = SPIN_SIZE / 2, cy = SPIN_SIZE / 2;
+  const R = SPIN_SIZE / 2 - 3;
+  const MAX_OFFSET = R * 0.78;
+  // クランプ（円形範囲内）
+  let dx = px - cx, dy = py - cy;
+  const d = Math.sqrt(dx*dx + dy*dy);
+  if (d > MAX_OFFSET) { dx = dx/d * MAX_OFFSET; dy = dy/d * MAX_OFFSET; }
+  return {
+    x: Math.round(dx / MAX_OFFSET * 10) / 10,
+    y: Math.round(-dy / MAX_OFFSET * 10) / 10,
+  };
+}
+
+let _spinDragging = false;
+spinCanvas.addEventListener('mousedown', e => {
+  _spinDragging = true;
+  STATE.spin = getSpinFromPos(e);
+  drawSpinSelector();
+  draw();
+});
+spinCanvas.addEventListener('mousemove', e => {
+  if (!_spinDragging) return;
+  STATE.spin = getSpinFromPos(e);
+  drawSpinSelector();
+  draw();
+});
+spinCanvas.addEventListener('mouseup', () => { _spinDragging = false; });
+spinCanvas.addEventListener('mouseleave', () => { _spinDragging = false; });
+
+spinCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  _spinDragging = true;
+  STATE.spin = getSpinFromPos(e);
+  drawSpinSelector();
+  draw();
+}, { passive: false });
+spinCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!_spinDragging) return;
+  STATE.spin = getSpinFromPos(e);
+  drawSpinSelector();
+  draw();
+}, { passive: false });
+spinCanvas.addEventListener('touchend', () => { _spinDragging = false; });
+
+// ダブルタップでリセット
+spinCanvas.addEventListener('dblclick', () => {
+  STATE.spin = { x: 0, y: 0 };
+  drawSpinSelector();
+  draw();
+});
+
+/* ============================================================
+   INIT & RESIZE
+============================================================ */
+window.addEventListener('resize', () => resizeCanvas());
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+
+buildPocketButtons();
+resizeCanvas();
+drawSpinSelector();
+</script>
+</body>
+</html>
