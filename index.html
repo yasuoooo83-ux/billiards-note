@@ -648,91 +648,100 @@
 
     /* ==========================================
        LANDSCAPE (横画面) LAYOUT
-       台ビューを左右2カラムに切り替える
-       左: キャンバス / 右: セレクター・stats・ボタン
+       台を最大化し、右サイドバーに縦積みコントロール
     ========================================== */
     @media (orientation: landscape) and (max-height: 500px) {
 
+      /* ヘッダーを薄く */
       header {
-        padding: 6px 12px;
+        padding: 4px 10px;
       }
-      .header-title { font-size: 0.9rem; }
-      .tab-btn { padding: 4px 10px; font-size: 0.75rem; }
+      .header-title { font-size: 0.85rem; }
+      .tab-btn { padding: 3px 9px; font-size: 0.72rem; }
 
-      /* table viewをrowに切り替え */
+      /* main を横並びに（ヘッダー除く全体） */
+      main { flex-direction: row; }
+
+      /* table view: キャンバスを最大化、右サイドバー固定幅 */
       #view-table {
         flex-direction: row;
-        flex-wrap: wrap;
+        padding: 4px;
+        gap: 4px;
         align-items: stretch;
-        padding: 5px;
-        gap: 5px;
+        overflow: hidden;
       }
 
-      /* キャンバスを左側に、flex:1で伸ばす */
+      /* ===== 左: キャンバス（残り全幅） ===== */
       #view-table .canvas-wrapper {
         flex: 1;
-        order: 1;
+        order: 0;
         min-width: 0;
         min-height: 0;
+        align-items: stretch;
       }
 
-      /* 右カラム: 残りの要素をまとめる */
-      #view-table .ball-selector {
-        order: 2;
-        width: 155px;
-        flex-shrink: 0;
-        padding: 5px 8px;
-        border-radius: var(--radius-sm);
-        align-self: flex-start;
-      }
-      #view-table .stats-spin-row {
-        order: 3;
-        width: 155px;
-        flex-shrink: 0;
-        border-radius: var(--radius-sm);
-        align-self: flex-start;
-        flex-direction: column;
-      }
+      /* ===== 右サイドバー: 130px固定 ===== */
+      #view-table .ball-selector,
+      #view-table .stats-spin-row,
       #view-table .action-bar {
-        order: 4;
-        width: 155px;
+        width: 130px;
         flex-shrink: 0;
-        border-radius: var(--radius-sm);
-        padding: 5px 6px;
-        gap: 4px;
+        flex-grow: 0;
+        /* flex-wrap で右カラムに積み上がるよう order を付ける */
+      }
+      #view-table .ball-selector  { order: 1; align-self: flex-start; padding: 5px 6px; }
+      #view-table .stats-spin-row { order: 2; align-self: flex-start; flex-direction: column; border-radius: var(--radius-sm); }
+      #view-table .action-bar     { order: 3; align-self: flex-start; padding: 4px 5px; gap: 3px; flex-wrap: wrap; border-radius: var(--radius-sm); }
+
+      /* flex-wrap で右カラムを折り返しで縦積みにする */
+      #view-table {
         flex-wrap: wrap;
-        align-self: flex-start;
+        align-content: flex-start;
+      }
+      /* canvas-wrapper だけ高さを全体に伸ばす */
+      #view-table .canvas-wrapper {
+        height: 100%;
+        align-self: stretch;
       }
 
-      /* 右カラム内の要素を縮小 */
+      /* ---- 右サイドバー内の要素を小さく ---- */
       .selector-label { display: none; }
-      .ball-options { gap: 6px; }
-      .ball-opt { padding: 3px 6px; font-size: 0.65rem; }
-      .ball-circle { width: 22px; height: 22px; }
+      .ball-options { gap: 4px; justify-content: center; }
+      .ball-opt { padding: 2px 5px; font-size: 0.6rem; }
+      .ball-circle { width: 20px; height: 20px; }
 
       .stats-panel {
         grid-template-columns: 1fr 1fr;
-        gap: 3px 6px;
-        padding: 6px 8px;
+        gap: 2px 4px;
+        padding: 5px 6px;
       }
-      .stat-label { font-size: 0.58rem; }
-      .stat-value { font-size: 0.82rem; }
+      .stat-label { font-size: 0.54rem; }
+      .stat-value { font-size: 0.78rem; }
 
+      /* spin selector を横並びでコンパクトに */
       .spin-selector {
         border-left: none;
         border-top: 1px solid rgba(255,255,255,0.07);
         flex-direction: row;
-        justify-content: flex-start;
-        padding: 5px 8px;
-        gap: 8px;
+        justify-content: center;
+        align-items: center;
+        padding: 4px 6px;
+        gap: 6px;
       }
+      .spin-label { font-size: 0.55rem; }
+      .spin-value { font-size: 0.58rem; }
 
-      .btn {
-        padding: 8px 4px;
-        font-size: 0.68rem;
+      /* ボタン: 2列で詰める */
+      #view-table .action-bar .btn {
+        padding: 7px 3px;
+        font-size: 0.62rem;
+        flex-basis: calc(50% - 2px);
         min-width: 0;
       }
     }
+
+    /* ==========================================
+       BOWLLIARD VIEW
     ========================================== */
     #view-bowlliard {
       overflow-y: auto;
