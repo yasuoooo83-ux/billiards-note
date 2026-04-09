@@ -1,0 +1,14 @@
+{
+  "name": "ビリヤードノート",
+  "short_name": "ビリヤード",
+  "display": "standalone",
+  "background_color": "#0f1f0f",
+  "theme_color": "#1a2e1a",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/1a2e1a/66bb6a.png?text=Billiard",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
