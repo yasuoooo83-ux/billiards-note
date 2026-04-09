@@ -647,7 +647,92 @@
     }
 
     /* ==========================================
-       BOWLLIARD VIEW
+       LANDSCAPE (横画面) LAYOUT
+       台ビューを左右2カラムに切り替える
+       左: キャンバス / 右: セレクター・stats・ボタン
+    ========================================== */
+    @media (orientation: landscape) and (max-height: 500px) {
+
+      header {
+        padding: 6px 12px;
+      }
+      .header-title { font-size: 0.9rem; }
+      .tab-btn { padding: 4px 10px; font-size: 0.75rem; }
+
+      /* table viewをrowに切り替え */
+      #view-table {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        padding: 5px;
+        gap: 5px;
+      }
+
+      /* キャンバスを左側に、flex:1で伸ばす */
+      #view-table .canvas-wrapper {
+        flex: 1;
+        order: 1;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      /* 右カラム: 残りの要素をまとめる */
+      #view-table .ball-selector {
+        order: 2;
+        width: 155px;
+        flex-shrink: 0;
+        padding: 5px 8px;
+        border-radius: var(--radius-sm);
+        align-self: flex-start;
+      }
+      #view-table .stats-spin-row {
+        order: 3;
+        width: 155px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        align-self: flex-start;
+        flex-direction: column;
+      }
+      #view-table .action-bar {
+        order: 4;
+        width: 155px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        padding: 5px 6px;
+        gap: 4px;
+        flex-wrap: wrap;
+        align-self: flex-start;
+      }
+
+      /* 右カラム内の要素を縮小 */
+      .selector-label { display: none; }
+      .ball-options { gap: 6px; }
+      .ball-opt { padding: 3px 6px; font-size: 0.65rem; }
+      .ball-circle { width: 22px; height: 22px; }
+
+      .stats-panel {
+        grid-template-columns: 1fr 1fr;
+        gap: 3px 6px;
+        padding: 6px 8px;
+      }
+      .stat-label { font-size: 0.58rem; }
+      .stat-value { font-size: 0.82rem; }
+
+      .spin-selector {
+        border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.07);
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 5px 8px;
+        gap: 8px;
+      }
+
+      .btn {
+        padding: 8px 4px;
+        font-size: 0.68rem;
+        min-width: 0;
+      }
+    }
     ========================================== */
     #view-bowlliard {
       overflow-y: auto;
